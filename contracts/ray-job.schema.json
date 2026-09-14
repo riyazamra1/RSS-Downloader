@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rss-downloader/ray-job.schema.json",
+  "title": "RSS Downloader RAY Job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["jobId", "provider", "operation", "input"],
+  "properties": {
+    "jobId": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "operation": { "type": "string", "enum": ["analyze", "search", "download"] },
+    "input": { "type": "object", "additionalProperties": true },
+    "requestedFormat": { "type": ["string", "null"] },
+    "requestedQuality": { "type": ["string", "null"] },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved"],
+      "properties": {
+        "approved": { "type": "boolean" },
+        "policyVersion": { "type": ["string", "null"] }
+      }
+    },
+    "attempt": { "type": "integer", "minimum": 1 }
+  }
+}
