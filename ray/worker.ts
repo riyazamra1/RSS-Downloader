@@ -104,7 +104,7 @@ export class RayWorker implements RayDispatcher {
   }
 
   private resolveAdapter(provider: string): RayAdapter {
-    if (provider !== "auto" && provider !== "catalog") {
+    if (provider !== "auto") {
       const adapter = this.adapters.get(provider);
       if (adapter) return adapter;
     }
