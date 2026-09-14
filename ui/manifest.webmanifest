@@ -1,0 +1,21 @@
+{
+  "name": "RSS Downloader",
+  "short_name": "RSS Downloader",
+  "description": "RSS Downloader by Razeen Secure Solution",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070b16",
+  "theme_color": "#0b1020",
+  "icons": [
+    {
+      "src": "../rss-downloader-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "../rss-downloader-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
