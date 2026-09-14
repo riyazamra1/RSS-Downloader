@@ -16,6 +16,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
       - name: Prepare UI assets
         run: mkdir -p android/app/src/main/assets/ui && cp -R ui/. android/app/src/main/assets/ui/
       - name: Build APK
