@@ -1,0 +1,96 @@
+name: RSS Downloader Google Drive Backup
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete Git history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create complete project snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup
+          TS="$(date -u +%Y%m%dT%H%M%SZ)"
+          ZIP="RSS-Downloader-${TS}.zip"
+          BUNDLE="RSS-Downloader-${TS}.bundle"
+
+          # Complete tracked project snapshot at the exact commit being backed up.
+          git archive --format=zip --output="backup/${ZIP}" HEAD
+
+          # Git bundle preserves repository history and refs available to the runner.
+          git bundle create "backup/${BUNDLE}" --all
+
+          printf '%s\n' "commit=$(git rev-parse HEAD)" "created_at=${TS}" > backup/backup-manifest.txt
+          printf '%s\n' "project=RSS-Downloader" >> backup/backup-manifest.txt
+          printf '%s\n' "snapshot=${ZIP}" >> backup/backup-manifest.txt
+          printf '%s\n' "git_history=${BUNDLE}" >> backup/backup-manifest.txt
+
+      - name: Get Google OAuth access token
+        id: google-token
+        shell: bash
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$GOOGLE_DRIVE_CLIENT_ID"
+          test -n "$GOOGLE_DRIVE_CLIENT_SECRET"
+          test -n "$GOOGLE_DRIVE_REFRESH_TOKEN"
+
+          RESPONSE="$(curl -fsS -X POST https://oauth2.googleapis.com/token \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode "client_id=${GOOGLE_DRIVE_CLIENT_ID}" \
+            --data-urlencode "client_secret=${GOOGLE_DRIVE_CLIENT_SECRET}" \
+            --data-urlencode "refresh_token=${GOOGLE_DRIVE_REFRESH_TOKEN}" \
+            --data-urlencode 'grant_type=refresh_token')"
+
+          TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<< "$RESPONSE")"
+          echo "access_token=${TOKEN}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload backups to Google Drive
+        shell: bash
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.google-token.outputs.access_token }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$GOOGLE_DRIVE_FOLDER_ID"
+
+          upload_file() {
+            local file="$1"
+            local name
+            name="$(basename "$file")"
+            local metadata
+            metadata="$(python -c 'import json,sys; print(json.dumps({"name":sys.argv[1],"parents":[sys.argv[2]]}))' "$name" "$GOOGLE_DRIVE_FOLDER_ID")"
+
+            curl -fsS -X POST \
+              'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart' \
+              -H "Authorization: Bearer ${GOOGLE_ACCESS_TOKEN}" \
+              -F "metadata=${metadata};type=application/json;charset=UTF-8" \
+              -F "file=@${file};type=application/octet-stream" \
+              >/dev/null
+          }
+
+          for file in backup/*; do
+            upload_file "$file"
+          done
+
+      - name: Backup summary
+        run: |
+          echo "Google Drive backup completed successfully."
+          ls -lh backup/
