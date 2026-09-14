@@ -1,5 +1,6 @@
 import type { DownloadJob } from "../core/contracts/api";
 import type { RayDispatcher } from "../core/core";
+import { getMovieProviderPolicy } from "./adapters/movie-provider-policy";
 
 export interface RayAdapter {
   readonly provider: string;
@@ -31,8 +32,10 @@ export class RayWorker implements RayDispatcher {
     }
 
     const adapter = this.resolveAdapter(job.provider);
-    if (job.operation === "analyze") return adapter.analyze(job.input);
-    if (job.operation === "search") return adapter.search(job.input);
+    const runtimeInput = this.withProviderPolicy(job.input);
+
+    if (job.operation === "analyze") return adapter.analyze(runtimeInput);
+    if (job.operation === "search") return adapter.search(runtimeInput);
 
     const queued: DownloadJob = {
       jobId: job.jobId,
@@ -42,7 +45,7 @@ export class RayWorker implements RayDispatcher {
     this.jobs.set(job.jobId, queued);
 
     try {
-      const completed = await adapter.download(job.input, queued);
+      const completed = await adapter.download(runtimeInput, queued);
       this.jobs.set(job.jobId, completed);
       return completed;
     } catch (error) {
@@ -62,6 +65,19 @@ export class RayWorker implements RayDispatcher {
     const cancelled = { ...job, status: "cancelled" as const };
     this.jobs.set(jobId, cancelled);
     return cancelled;
+  }
+
+  private withProviderPolicy(input: Record<string, unknown>): Record<string, unknown> {
+    const tab = typeof input.tab === "string" ? input.tab : undefined;
+    if (tab !== "tamil-movies" && tab !== "tamil-dubbed-movies") return input;
+
+    return {
+      ...input,
+      movieProviderPolicy: getMovieProviderPolicy({
+        tab,
+        url: typeof input.url === "string" ? input.url : "",
+      }),
+    };
   }
 
   private resolveAdapter(provider: string): RayAdapter {
