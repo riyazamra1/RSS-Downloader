@@ -64,6 +64,13 @@ export interface DownloadJob {
   jobId: string;
   status: DownloadStatus;
   progressPercent: number;
+  createdAt: number;
+  updatedAt: number;
+  title?: string;
+  thumbnailUrl?: string;
+  mediaKind?: MediaKind;
+  quality?: string;
+  format?: string;
   downloadedBytes?: number;
   totalBytes?: number;
   speedBytesPerSecond?: number;
@@ -72,12 +79,17 @@ export interface DownloadJob {
   outputName?: string;
 }
 
+export interface DownloadListResponse {
+  jobs: DownloadJob[];
+}
+
 export interface RssDownloaderApi {
   analyzeUrl(request: AnalyzeUrlRequest): Promise<AnalyzeUrlResponse>;
   search(request: SearchRequest): Promise<SearchResponse>;
   listMediaOptions(requestId: string): Promise<MediaOption[]>;
   createDownload(request: DownloadRequest): Promise<DownloadJob>;
   getDownload(jobId: string): Promise<DownloadJob>;
+  listDownloads(): Promise<DownloadListResponse>;
   cancelDownload(jobId: string): Promise<DownloadJob>;
   reorderTabs(order: DownloaderTab[]): Promise<DownloaderTab[]>;
 }
