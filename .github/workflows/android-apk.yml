@@ -21,7 +21,10 @@ jobs:
         with:
           gradle-version: '8.10.2'
       - name: Prepare UI assets
-        run: mkdir -p android/app/src/main/assets/ui && cp -R ui/. android/app/src/main/assets/ui/
+        run: |
+          mkdir -p android/app/src/main/assets/ui
+          cp -R ui/. android/app/src/main/assets/ui/
+          cp rss-downloader-logo.png android/app/src/main/assets/rss-downloader-logo.png
       - name: Build APK
         run: gradle -p android assembleDebug --no-daemon
       - name: Upload APK
