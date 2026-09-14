@@ -93,9 +93,6 @@ export class RssDownloaderCore implements RssDownloaderApi {
       attempt: 1,
     })) as SearchResponse;
 
-    // Search results may already contain authorized media options. Retain them
-    // under their requestId so the normal createDownload path can validate the
-    // selection without trusting the UI.
     for (const result of response.results) {
       if (!result.requestId || !result.mediaOptions?.length) continue;
       this.analyses.set(result.requestId, {
@@ -119,9 +116,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
 
   async createDownload(request: DownloadRequest): Promise<DownloadJob> {
     await this.ready;
-    if (!request.authorizationApproved) {
-      throw new Error("Download authorization must be approved before execution.");
-    }
+    if (!request.authorizationApproved) throw new Error("Download authorization must be approved before execution.");
 
     const analysis = this.analyses.get(request.requestId);
     if (!analysis) throw new Error(`Analysis request not found: ${request.requestId}`);
@@ -129,9 +124,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
     const selected = request.mediaOptionId
       ? analysis.mediaOptions.find((option) => option.id === request.mediaOptionId)
       : undefined;
-    if (request.mediaOptionId && !selected) {
-      throw new Error("Selected media option is not authorized for this request.");
-    }
+    if (request.mediaOptionId && !selected) throw new Error("Selected media option is not authorized for this request.");
 
     const now = Date.now();
     const jobId = crypto.randomUUID();
@@ -244,9 +237,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
     if (order.length !== DEFAULT_TABS.length || new Set(order).size !== DEFAULT_TABS.length) {
       throw new Error("Tab order must contain each approved tab exactly once.");
     }
-    if (order.some((tab) => !DEFAULT_TABS.includes(tab))) {
-      throw new Error("Tab order contains an unsupported tab.");
-    }
+    if (order.some((tab) => !DEFAULT_TABS.includes(tab))) throw new Error("Tab order contains an unsupported tab.");
     this.tabs = [...order];
     return [...this.tabs];
   }
