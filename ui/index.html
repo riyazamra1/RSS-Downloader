@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="RSS Downloader by Razeen Secure Solution">
+  <link rel="manifest" href="./manifest.webmanifest">
   <title>RSS Downloader</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -14,7 +16,10 @@
         <img src="../rss-downloader-logo.png" alt="RSS Downloader" class="logo">
         <div><strong>RSS Downloader</strong><span>Fast. Organized. Controlled.</span></div>
       </div>
-      <button id="downloadsButton" class="icon-button" aria-label="Downloads">↓ <span id="downloadBadge">0</span></button>
+      <div class="top-actions">
+        <button id="appearanceButton" class="icon-button" aria-label="Change appearance" title="Appearance">◐</button>
+        <button id="downloadsButton" class="icon-button" aria-label="Downloads">↓ <span id="downloadBadge">0</span></button>
+      </div>
     </header>
 
     <main>
@@ -34,7 +39,6 @@
           <div id="analysisState" class="state" hidden></div>
         </div>
         <section id="mediaOptions" class="panel" hidden></section>
-
         <div class="movie-grid" id="movieSearchArea"></div>
       </section>
 
@@ -43,7 +47,7 @@
         <div class="segmented"><button data-view="ongoing" class="active">Ongoing</button><button data-view="all">All Downloads</button></div>
         <div id="downloadsState" class="state" hidden></div>
         <section><h3>Ongoing Downloads</h3><div id="ongoingList" class="download-list"></div></section>
-        <section id="historySection"><h3>All Downloads</h3><div id="historyList" class="download-list"></div></section>
+        <section id="historySection" hidden><h3>All Downloads</h3><div id="historyList" class="download-list"></div></section>
       </section>
     </main>
   </div>
