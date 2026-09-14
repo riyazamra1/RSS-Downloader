@@ -11,6 +11,7 @@ import {
   type SearchResponse,
 } from "./contracts/api";
 import { createDownloaderEventBus, type DownloaderEventBus } from "./contracts/events";
+import { MemoryDownloadStore, type DownloadStore } from "./storage/download-store";
 
 export interface RayDispatcher {
   dispatch(job: {
@@ -36,13 +37,30 @@ export class RssDownloaderCore implements RssDownloaderApi {
   private readonly jobs = new Map<string, DownloadJob>();
   private readonly analyses = new Map<string, AnalyzeUrlResponse>();
   private readonly events: DownloaderEventBus;
+  private readonly ready: Promise<void>;
   private tabs: DownloaderTab[] = [...DEFAULT_TABS];
 
-  constructor(private readonly ray: RayDispatcher, events = createDownloaderEventBus()) {
+  constructor(
+    private readonly ray: RayDispatcher,
+    events = createDownloaderEventBus(),
+    private readonly store: DownloadStore = new MemoryDownloadStore(),
+  ) {
     this.events = events;
+    this.ready = this.hydrateJobs();
+  }
+
+  private async hydrateJobs(): Promise<void> {
+    const jobs = await this.store.load();
+    this.jobs.clear();
+    for (const job of jobs) this.jobs.set(job.jobId, { ...job });
+  }
+
+  private async persistJobs(): Promise<void> {
+    await this.store.save([...this.jobs.values()].map((job) => ({ ...job })));
   }
 
   async analyzeUrl(request: AnalyzeUrlRequest): Promise<AnalyzeUrlResponse> {
+    await this.ready;
     const url = request.url.trim();
     if (!/^https?:\/\//i.test(url)) throw new Error("A valid HTTP(S) URL is required.");
 
@@ -61,6 +79,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
   }
 
   async search(request: SearchRequest): Promise<SearchResponse> {
+    await this.ready;
     const query = request.query.trim();
     if (!DEFAULT_TABS.includes(request.tab)) throw new Error("Unsupported downloader tab.");
     if (!query) return { tab: request.tab, query: "", results: [] };
@@ -76,12 +95,14 @@ export class RssDownloaderCore implements RssDownloaderApi {
   }
 
   async listMediaOptions(requestId: string): Promise<MediaOption[]> {
+    await this.ready;
     const analysis = this.analyses.get(requestId);
     if (!analysis) throw new Error(`Analysis request not found: ${requestId}`);
     return [...analysis.mediaOptions];
   }
 
   async createDownload(request: DownloadRequest): Promise<DownloadJob> {
+    await this.ready;
     if (!request.authorizationApproved) {
       throw new Error("Download authorization must be approved before execution.");
     }
@@ -109,6 +130,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
     };
 
     this.jobs.set(jobId, queued);
+    await this.persistJobs();
     this.events.publish({ type: "download.created", job: queued });
 
     try {
@@ -136,6 +158,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
         totalBytes: result.totalBytes ?? queued.totalBytes,
       };
       this.jobs.set(jobId, finalJob);
+      await this.persistJobs();
       this.events.publish({
         type: finalJob.status === "completed" ? "download.completed" : "download.failed",
         job: finalJob,
@@ -149,18 +172,21 @@ export class RssDownloaderCore implements RssDownloaderApi {
         error: error instanceof Error ? error.message : String(error),
       };
       this.jobs.set(jobId, failed);
+      await this.persistJobs();
       this.events.publish({ type: "download.failed", job: failed });
       return failed;
     }
   }
 
   async getDownload(jobId: string): Promise<DownloadJob> {
+    await this.ready;
     const job = this.jobs.get(jobId);
     if (!job) throw new Error(`Download job not found: ${jobId}`);
     return { ...job };
   }
 
   async listDownloads(): Promise<DownloadListResponse> {
+    await this.ready;
     const jobs = [...this.jobs.values()]
       .sort((a, b) => {
         const aActive = a.status === "queued" || a.status === "running" || a.status === "paused";
@@ -173,6 +199,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
   }
 
   async cancelDownload(jobId: string): Promise<DownloadJob> {
+    await this.ready;
     const result = await this.ray.cancel(jobId);
     const current = this.jobs.get(jobId);
     const cancelled: DownloadJob = {
@@ -187,11 +214,13 @@ export class RssDownloaderCore implements RssDownloaderApi {
       format: result.format ?? current?.format,
     };
     this.jobs.set(jobId, cancelled);
+    await this.persistJobs();
     this.events.publish({ type: "download.cancelled", job: cancelled });
     return cancelled;
   }
 
   async reorderTabs(order: DownloaderTab[]): Promise<DownloaderTab[]> {
+    await this.ready;
     if (order.length !== DEFAULT_TABS.length || new Set(order).size !== DEFAULT_TABS.length) {
       throw new Error("Tab order must contain each approved tab exactly once.");
     }
