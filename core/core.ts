@@ -84,7 +84,7 @@ export class RssDownloaderCore implements RssDownloaderApi {
     if (!DEFAULT_TABS.includes(request.tab)) throw new Error("Unsupported downloader tab.");
     if (!query) return { tab: request.tab, query: "", results: [] };
 
-    return (await this.ray.dispatch({
+    const response = (await this.ray.dispatch({
       jobId: crypto.randomUUID(),
       provider: "catalog",
       operation: "search",
@@ -92,6 +92,22 @@ export class RssDownloaderCore implements RssDownloaderApi {
       authorization: { approved: false, policyVersion: "1" },
       attempt: 1,
     })) as SearchResponse;
+
+    // Search results may already contain authorized media options. Retain them
+    // under their requestId so the normal createDownload path can validate the
+    // selection without trusting the UI.
+    for (const result of response.results) {
+      if (!result.requestId || !result.mediaOptions?.length) continue;
+      this.analyses.set(result.requestId, {
+        requestId: result.requestId,
+        normalizedUrl: result.id,
+        title: result.title,
+        thumbnailUrl: result.thumbnailUrl,
+        mediaOptions: result.mediaOptions,
+      });
+    }
+
+    return response;
   }
 
   async listMediaOptions(requestId: string): Promise<MediaOption[]> {
@@ -113,6 +129,10 @@ export class RssDownloaderCore implements RssDownloaderApi {
     const selected = request.mediaOptionId
       ? analysis.mediaOptions.find((option) => option.id === request.mediaOptionId)
       : undefined;
+    if (request.mediaOptionId && !selected) {
+      throw new Error("Selected media option is not authorized for this request.");
+    }
+
     const now = Date.now();
     const jobId = crypto.randomUUID();
     const queued: DownloadJob = {
