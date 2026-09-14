@@ -33,6 +33,7 @@ const DEFAULT_TABS: DownloaderTab[] = [
 
 export class RssDownloaderCore implements RssDownloaderApi {
   private readonly jobs = new Map<string, DownloadJob>();
+  private readonly analyses = new Map<string, AnalyzeUrlResponse>();
   private readonly events: DownloaderEventBus;
   private tabs: DownloaderTab[] = [...DEFAULT_TABS];
 
@@ -43,7 +44,8 @@ export class RssDownloaderCore implements RssDownloaderApi {
   async analyzeUrl(request: AnalyzeUrlRequest): Promise<AnalyzeUrlResponse> {
     const url = request.url.trim();
     if (!/^https?:\/\//i.test(url)) throw new Error("A valid HTTP(S) URL is required.");
-    return (await this.ray.dispatch({
+
+    const response = (await this.ray.dispatch({
       jobId: crypto.randomUUID(),
       provider: "auto",
       operation: "analyze",
@@ -51,11 +53,17 @@ export class RssDownloaderCore implements RssDownloaderApi {
       authorization: { approved: false, policyVersion: "1" },
       attempt: 1,
     })) as AnalyzeUrlResponse;
+
+    if (!response.requestId) throw new Error("RAY analysis response is missing requestId.");
+    this.analyses.set(response.requestId, response);
+    return response;
   }
 
   async search(request: SearchRequest): Promise<SearchResponse> {
     const query = request.query.trim();
+    if (!DEFAULT_TABS.includes(request.tab)) throw new Error("Unsupported downloader tab.");
     if (!query) return { tab: request.tab, query: "", results: [] };
+
     return (await this.ray.dispatch({
       jobId: crypto.randomUUID(),
       provider: "catalog",
@@ -67,12 +75,17 @@ export class RssDownloaderCore implements RssDownloaderApi {
   }
 
   async listMediaOptions(requestId: string): Promise<MediaOption[]> {
-    throw new Error(`Media options are returned by analyzeUrl; request ${requestId} is not stored by Core yet.`);
+    const analysis = this.analyses.get(requestId);
+    if (!analysis) throw new Error(`Analysis request not found: ${requestId}`);
+    return [...analysis.mediaOptions];
   }
 
   async createDownload(request: DownloadRequest): Promise<DownloadJob> {
     if (!request.authorizationApproved) {
       throw new Error("Download authorization must be approved before execution.");
+    }
+    if (!this.analyses.has(request.requestId)) {
+      throw new Error(`Analysis request not found: ${request.requestId}`);
     }
 
     const jobId = crypto.randomUUID();
@@ -115,6 +128,9 @@ export class RssDownloaderCore implements RssDownloaderApi {
   async reorderTabs(order: DownloaderTab[]): Promise<DownloaderTab[]> {
     if (order.length !== DEFAULT_TABS.length || new Set(order).size !== DEFAULT_TABS.length) {
       throw new Error("Tab order must contain each approved tab exactly once.");
+    }
+    if (order.some((tab) => !DEFAULT_TABS.includes(tab))) {
+      throw new Error("Tab order contains an unsupported tab.");
     }
     this.tabs = [...order];
     return [...this.tabs];
