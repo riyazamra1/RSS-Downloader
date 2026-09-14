@@ -37,6 +37,8 @@ export interface SearchResult {
   thumbnailUrl?: string;
   year?: number;
   qualities?: string[];
+  requestId?: string;
+  mediaOptions?: MediaOption[];
 }
 
 export interface SearchResponse {
