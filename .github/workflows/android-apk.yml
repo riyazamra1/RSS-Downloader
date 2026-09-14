@@ -11,6 +11,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install JavaScript dependencies
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Bundle RSS Core + RAY runtime
+        run: npx esbuild android/runtime-entry.ts --bundle --format=iife --platform=browser --target=es2022 --outfile=android/app/src/main/assets/android-runtime.js
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
