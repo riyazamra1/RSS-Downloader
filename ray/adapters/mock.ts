@@ -29,11 +29,17 @@ export class MockRayAdapter implements RayAdapter {
     };
   }
 
-  async download(_input: Record<string, unknown>, job: DownloadJob): Promise<DownloadJob> {
-    return {
-      ...job,
-      status: "completed",
-      progressPercent: 100,
-    };
+  async download(
+    _input: Record<string, unknown>,
+    job: DownloadJob,
+    onProgress?: (job: DownloadJob) => void,
+  ): Promise<DownloadJob> {
+    let current = { ...job, status: "running" as const, progressPercent: 0 };
+    for (const progressPercent of [10, 25, 50, 75, 90, 100]) {
+      current = { ...current, progressPercent, updatedAt: Date.now() };
+      onProgress?.(current);
+      if (progressPercent < 100) await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    return { ...current, status: "completed", progressPercent: 100, updatedAt: Date.now() };
   }
 }
