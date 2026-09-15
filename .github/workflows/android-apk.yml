@@ -48,13 +48,12 @@ jobs:
             echo "sdkmanager not found; relying on the preinstalled Android SDK."
           fi
 
-      - name: Prepare UI and exact logo assets
+      - name: Prepare native Android logo asset
         run: |
           set -euo pipefail
-          mkdir -p android/app/src/main/assets/ui android/app/src/main/res/drawable-nodpi
-          cp -R ui/. android/app/src/main/assets/ui/
-          cp rss-downloader-logo.png android/app/src/main/assets/rss-downloader-logo.png
+          mkdir -p android/app/src/main/res/drawable-nodpi
           cp rss-downloader-logo.png android/app/src/main/res/drawable-nodpi/rss_downloader_logo.png
+          rm -rf android/app/src/main/assets/ui android/app/src/main/assets/android-runtime.js
 
       - name: Build APK
         run: |
