@@ -13,23 +13,13 @@
   <div class="app-shell">
     <header class="topbar">
       <button id="menuButton" class="menu-button" aria-label="Open menu" aria-expanded="false">☰</button>
-      <div class="brand">
-        <img src="../rss-downloader-logo.png" alt="RSS Downloader" class="logo">
-        <div><strong>RSS Downloader</strong><span>Fast. Organized. Controlled.</span></div>
-      </div>
-      <div class="top-actions">
-        <button id="downloadsButton" class="icon-button" aria-label="Downloads">↓ <span id="downloadBadge">0</span></button>
-      </div>
+      <div class="brand"><img src="../rss-downloader-logo.png" alt="RSS Downloader" class="logo"><div><strong>RSS Downloader</strong><span>Fast. Organized. Controlled.</span></div></div>
+      <div class="top-actions"><button id="downloadsButton" class="icon-button" aria-label="Downloads">↓ <span id="downloadBadge">0</span></button></div>
+      <div class="legacy-controls" aria-hidden="true"><button id="appearanceButton">☾</button><button id="settingsButton">⚙</button></div>
     </header>
 
     <aside id="sideMenu" class="side-menu" aria-hidden="true">
-      <div class="side-menu-head">
-        <div class="brand">
-          <img src="../rss-downloader-logo.png" alt="RSS Downloader" class="logo">
-          <div><strong>RSS Downloader</strong><span>Menu</span></div>
-        </div>
-        <button id="closeMenu" class="icon-button" aria-label="Close menu">×</button>
-      </div>
+      <div class="side-menu-head"><div class="brand"><img src="../rss-downloader-logo.png" alt="RSS Downloader" class="logo"><div><strong>RSS Downloader</strong><span>Menu</span></div></div><button id="closeMenu" class="icon-button" aria-label="Close menu">×</button></div>
       <div class="side-menu-content">
         <button class="menu-item" data-menu-action="downloads"><span>↓</span> Downloads</button>
         <div class="menu-section-title">Appearance</div>
@@ -41,42 +31,12 @@
 
     <main>
       <nav id="tabs" class="tabs" aria-label="Downloader tabs"></nav>
-
       <section id="homeView" class="view">
-        <div class="hero-card">
-          <div class="hero-copy">
-            <p class="eyebrow">SOCIAL DOWNLOADER</p>
-            <h1>Paste a link.<br>RSS handles the rest.</h1>
-            <p class="muted">Copy a supported URL and it will be detected automatically.</p>
-          </div>
-          <div class="url-row">
-            <input id="urlInput" autocomplete="off" inputmode="url" placeholder="Paste URL here…">
-            <button id="analyzeButton" class="primary">Analyze</button>
-          </div>
-          <div id="analysisState" class="state" hidden></div>
-        </div>
-        <section id="mediaOptions" class="panel" hidden></section>
-        <div class="movie-grid" id="movieSearchArea"></div>
+        <div class="hero-card"><div class="hero-copy"><p class="eyebrow">SOCIAL DOWNLOADER</p><h1>Paste a link.<br>RSS handles the rest.</h1><p class="muted">Copy a supported URL and it will be detected automatically.</p></div><div class="url-row"><input id="urlInput" autocomplete="off" inputmode="url" placeholder="Paste URL here…"><button id="analyzeButton" class="primary">Analyze</button></div><div id="analysisState" class="state" hidden></div></div>
+        <section id="mediaOptions" class="panel" hidden></section><div class="movie-grid" id="movieSearchArea"></div>
       </section>
-
-      <section id="downloadsView" class="view" hidden>
-        <div class="page-heading"><div><p class="eyebrow">DOWNLOADS</p><h2>Downloads</h2></div><button id="refreshDownloads" class="secondary">Refresh</button></div>
-        <div class="segmented"><button data-view="ongoing" class="active">Ongoing</button><button data-view="all">All Downloads</button></div>
-        <div id="downloadsState" class="state" hidden></div>
-        <section><h3>Ongoing Downloads</h3><div id="ongoingList" class="download-list"></div></section>
-        <section id="historySection" hidden><h3>All Downloads</h3><div id="historyList" class="download-list"></div></section>
-      </section>
-
-      <section id="settingsView" class="view" hidden>
-        <div class="page-heading"><div><p class="eyebrow">RSS DOWNLOADER</p><h2>Settings</h2></div><button id="closeSettings" class="secondary">Done</button></div>
-        <section class="panel settings-panel">
-          <div class="setting-row"><div><strong>Appearance</strong><div class="meta">Use light or dark interface</div></div><label class="switch"><input id="themeSwitch" type="checkbox"><span></span></label></div>
-          <div class="setting-row"><div><strong>Auto-paste copied URL</strong><div class="meta">Detect a copied HTTP(S) URL when RSS Downloader is active</div></div><label class="switch"><input id="clipboardSwitch" type="checkbox" checked><span></span></label></div>
-          <div class="setting-row"><div><strong>Pre-loaded movie lists</strong><div class="meta">Show Tamil Movies and Tamil Dubbed Movies immediately</div></div><label class="switch"><input id="preloadSwitch" type="checkbox" checked><span></span></label></div>
-          <div class="setting-row"><div><strong>Tab order</strong><div class="meta">Drag the tabs to rearrange them</div></div><button id="resetTabs" class="secondary">Reset</button></div>
-          <div class="settings-about"><img src="../rss-downloader-logo.png" alt="RSS Downloader"><div><strong>RSS Downloader</strong><div class="meta">Razeen Secure Solution</div></div></div>
-        </section>
-      </section>
+      <section id="downloadsView" class="view" hidden><div class="page-heading"><div><p class="eyebrow">DOWNLOADS</p><h2>Downloads</h2></div><button id="refreshDownloads" class="secondary">Refresh</button></div><div class="segmented"><button data-view="ongoing" class="active">Ongoing</button><button data-view="all">All Downloads</button></div><div id="downloadsState" class="state" hidden></div><section><h3>Ongoing Downloads</h3><div id="ongoingList" class="download-list"></div></section><section id="historySection" hidden><h3>All Downloads</h3><div id="historyList" class="download-list"></div></section></section>
+      <section id="settingsView" class="view" hidden><div class="page-heading"><div><p class="eyebrow">RSS DOWNLOADER</p><h2>Settings</h2></div><button id="closeSettings" class="secondary">Done</button></div><section class="panel settings-panel"><div class="setting-row"><div><strong>Appearance</strong><div class="meta">Use light or dark interface</div></div><label class="switch"><input id="themeSwitch" type="checkbox"><span></span></label></div><div class="setting-row"><div><strong>Auto-paste copied URL</strong><div class="meta">Detect a copied HTTP(S) URL when RSS Downloader is active</div></div><label class="switch"><input id="clipboardSwitch" type="checkbox" checked><span></span></label></div><div class="setting-row"><div><strong>Pre-loaded movie lists</strong><div class="meta">Show Tamil Movies and Tamil Dubbed Movies immediately</div></div><label class="switch"><input id="preloadSwitch" type="checkbox" checked><span></span></label></div><div class="setting-row"><div><strong>Tab order</strong><div class="meta">Drag the tabs to rearrange them</div></div><button id="resetTabs" class="secondary">Reset</button></div><div class="settings-about"><img src="../rss-downloader-logo.png" alt="RSS Downloader"><div><strong>RSS Downloader</strong><div class="meta">Razeen Secure Solution</div></div></div></section></section>
     </main>
 
     <nav class="bottom-nav" aria-label="Main navigation">
@@ -86,30 +46,9 @@
       <button class="bottom-nav-item" data-bottom-action="settings"><span>⚙</span><small>Settings</small></button>
     </nav>
   </div>
-  <script src="../android-runtime.js"></script>
-  <script src="./app.js"></script>
+  <script src="../android-runtime.js"></script><script src="./app.js"></script>
   <script>
-    (() => {
-      const menu = document.querySelector('#sideMenu');
-      const backdrop = document.querySelector('#menuBackdrop');
-      const open = () => { menu.classList.add('open'); backdrop.hidden = false; document.querySelector('#menuButton').setAttribute('aria-expanded','true'); menu.setAttribute('aria-hidden','false'); };
-      const close = () => { menu.classList.remove('open'); backdrop.hidden = true; document.querySelector('#menuButton').setAttribute('aria-expanded','false'); menu.setAttribute('aria-hidden','true'); };
-      document.querySelector('#menuButton').addEventListener('click', open);
-      document.querySelector('#closeMenu').addEventListener('click', close);
-      backdrop.addEventListener('click', close);
-      document.querySelectorAll('[data-bottom-tab]').forEach(button => button.addEventListener('click', () => {
-        const tab = document.querySelector(`.tab[data-tab="${button.dataset.bottomTab}"]`); if (tab) tab.click();
-        document.querySelectorAll('.bottom-nav-item').forEach(x => x.classList.toggle('active', x === button));
-      }));
-      document.querySelector('[data-bottom-action="settings"]').addEventListener('click', () => { document.querySelector('#settingsButton')?.click(); document.querySelectorAll('.bottom-nav-item').forEach(x => x.classList.remove('active')); document.querySelector('[data-bottom-action="settings"]').classList.add('active'); });
-      document.querySelectorAll('[data-menu-action="settings"]').forEach(b => b.addEventListener('click', () => { document.querySelector('#settingsButton')?.click(); close(); }));
-      document.querySelector('[data-menu-action="downloads"]').addEventListener('click', () => { document.querySelector('#downloadsButton')?.click(); close(); });
-      const drawerSwitch = document.querySelector('#drawerThemeSwitch');
-      const syncTheme = () => { drawerSwitch.checked = document.documentElement.dataset.theme === 'light'; };
-      drawerSwitch.addEventListener('change', () => { const mainSwitch = document.querySelector('#themeSwitch'); if (mainSwitch) { mainSwitch.checked = drawerSwitch.checked; mainSwitch.dispatchEvent(new Event('change')); } });
-      new MutationObserver(syncTheme).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
-      setTimeout(syncTheme, 0);
-    })();
+    (()=>{const menu=document.querySelector('#sideMenu'),backdrop=document.querySelector('#menuBackdrop');const open=()=>{menu.classList.add('open');backdrop.hidden=false;document.querySelector('#menuButton').setAttribute('aria-expanded','true');menu.setAttribute('aria-hidden','false')};const close=()=>{menu.classList.remove('open');backdrop.hidden=true;document.querySelector('#menuButton').setAttribute('aria-expanded','false');menu.setAttribute('aria-hidden','true')};document.querySelector('#menuButton').addEventListener('click',open);document.querySelector('#closeMenu').addEventListener('click',close);backdrop.addEventListener('click',close);document.querySelectorAll('[data-bottom-tab]').forEach(button=>button.addEventListener('click',()=>{const tab=document.querySelector(`.tab[data-tab="${button.dataset.bottomTab}"]`);if(tab)tab.click();document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.toggle('active',x===button))}));document.querySelector('[data-bottom-action="settings"]').addEventListener('click',()=>{document.querySelector('#settingsButton')?.click();document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));document.querySelector('[data-bottom-action="settings"]').classList.add('active')});document.querySelectorAll('[data-menu-action="settings"]').forEach(b=>b.addEventListener('click',()=>{document.querySelector('#settingsButton')?.click();close()}));document.querySelector('[data-menu-action="downloads"]').addEventListener('click',()=>{document.querySelector('#downloadsButton')?.click();close()});const drawerSwitch=document.querySelector('#drawerThemeSwitch');const syncTheme=()=>{drawerSwitch.checked=document.documentElement.dataset.theme==='light'};drawerSwitch.addEventListener('change',()=>{const mainSwitch=document.querySelector('#themeSwitch');if(mainSwitch){mainSwitch.checked=drawerSwitch.checked;mainSwitch.dispatchEvent(new Event('change'))}});new MutationObserver(syncTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});setTimeout(syncTheme,0)})();
   </script>
 </body>
 </html>
