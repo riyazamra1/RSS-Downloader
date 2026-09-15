@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.Context
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -21,10 +22,10 @@ class DownloadKeepAliveService : Service() {
         private const val CHANNEL_ID = "rss_downloader_downloads"
         private const val NOTIFICATION_ID = 4101
 
-        fun startIntent(service: Service): Intent = Intent(service, DownloadKeepAliveService::class.java)
+        fun startIntent(context: Context): Intent = Intent(context, DownloadKeepAliveService::class.java)
             .setAction(ACTION_START)
 
-        fun stopIntent(service: Service): Intent = Intent(service, DownloadKeepAliveService::class.java)
+        fun stopIntent(context: Context): Intent = Intent(context, DownloadKeepAliveService::class.java)
             .setAction(ACTION_STOP)
     }
 
