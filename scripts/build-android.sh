@@ -33,12 +33,19 @@ fi
 
 npm run typecheck
 
-mkdir -p "$ANDROID_DIR/app/src/main/assets"
+# Package the web UI into Android assets. MainActivity loads file:///android_asset/ui/index.html.
+ASSETS_DIR="$ANDROID_DIR/app/src/main/assets"
+rm -rf "$ASSETS_DIR/ui"
+mkdir -p "$ASSETS_DIR/ui"
+cp -R "$ROOT_DIR/ui/." "$ASSETS_DIR/ui/"
+cp "$ROOT_DIR/rss-downloader-logo.png" "$ASSETS_DIR/rss-downloader-logo.png"
+
+# index.html expects the bundled runtime at ../android-runtime.js from assets/ui/.
 npx esbuild android/runtime-entry.ts \
   --bundle \
   --platform=browser \
   --format=iife \
-  --outfile=android/app/src/main/assets/runtime.js
+  --outfile="$ASSETS_DIR/android-runtime.js"
 
 cd "$ANDROID_DIR"
 
@@ -91,4 +98,4 @@ echo "APK=$APK"
 echo "SIZE=$SIZE"
 echo "SHA256=$SHA256"
 echo ""
-echo "The APK is ready for the OpenHands/Cloudflare artifact upload step."
+echo "The APK is ready for installation."
