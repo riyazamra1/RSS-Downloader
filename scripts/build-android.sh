@@ -3,12 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/android"
+GRADLE_VERSION="8.11.1"
+GRADLE_HOME="$ROOT_DIR/.build-tools/gradle-$GRADLE_VERSION"
 
 cd "$ROOT_DIR"
 
 echo "== RSS Downloader Android build =="
 echo "Root: $ROOT_DIR"
-
 echo "Android: $ANDROID_DIR"
 
 if ! command -v java >/dev/null 2>&1; then
@@ -42,14 +43,34 @@ npx esbuild android/runtime-entry.ts \
 cd "$ANDROID_DIR"
 
 if [ ! -x ./gradlew ]; then
-  if ! command -v gradle >/dev/null 2>&1; then
-    echo "ERROR: Gradle is not installed and android/gradlew is absent." >&2
-    echo "Install Gradle 8.11.1 (or newer compatible Gradle) in OpenHands, then rerun this script." >&2
-    exit 1
+  GRADLE_CMD=""
+
+  if command -v gradle >/dev/null 2>&1; then
+    GRADLE_CMD="$(command -v gradle)"
+  else
+    echo "System Gradle not found; bootstrapping Gradle $GRADLE_VERSION locally..."
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "ERROR: curl is required to bootstrap Gradle $GRADLE_VERSION." >&2
+      exit 1
+    fi
+    if ! command -v unzip >/dev/null 2>&1; then
+      echo "ERROR: unzip is required to bootstrap Gradle $GRADLE_VERSION." >&2
+      exit 1
+    fi
+
+    mkdir -p "$ROOT_DIR/.build-tools"
+    if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
+      TMP_ZIP="$ROOT_DIR/.build-tools/gradle-$GRADLE_VERSION-bin.zip"
+      curl -fsSL "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$TMP_ZIP"
+      rm -rf "$GRADLE_HOME"
+      unzip -q "$TMP_ZIP" -d "$ROOT_DIR/.build-tools"
+      rm -f "$TMP_ZIP"
+    fi
+    GRADLE_CMD="$GRADLE_HOME/bin/gradle"
   fi
 
-  echo "Generating Gradle wrapper 8.11.1..."
-  gradle --no-daemon wrapper --gradle-version 8.11.1 --distribution-type bin
+  echo "Generating Gradle wrapper $GRADLE_VERSION..."
+  "$GRADLE_CMD" --no-daemon wrapper --gradle-version "$GRADLE_VERSION" --distribution-type bin
 fi
 
 chmod +x ./gradlew
