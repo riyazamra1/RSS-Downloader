@@ -4,49 +4,76 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-  schedule:
-    - cron: '*/10 * * * *'
 
 permissions:
   contents: read
 
 jobs:
   build-apk:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rss, ubuntu, ai]
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Install JavaScript dependencies
-        run: npm install
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Bundle RSS Core + RAY runtime
-        run: npx esbuild android/runtime-entry.ts --bundle --format=iife --platform=browser --target=es2022 --outfile=android/app/src/main/assets/android-runtime.js
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
+          fetch-depth: 0
+
+      - name: Verify build environment
+        run: |
+          set -euo pipefail
+          command -v git
+          command -v node
+          command -v npm
+          command -v java
+          command -v curl
+          command -v unzip
+          java -version
+          node --version
+          npm --version
+
+      - name: Install Android SDK components when sdkmanager is available
+        run: |
+          set -euo pipefail
+          SDKMANAGER=""
+          for candidate in \
+            "${ANDROID_HOME:-}/cmdline-tools/latest/bin/sdkmanager" \
+            "${ANDROID_SDK_ROOT:-}/cmdline-tools/latest/bin/sdkmanager" \
+            "$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager"; do
+            if [[ -x "$candidate" ]]; then SDKMANAGER="$candidate"; break; fi
+          done
+          if [[ -n "$SDKMANAGER" ]]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+            "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          else
+            echo "sdkmanager not found; relying on the preinstalled Android SDK."
+          fi
+
       - name: Prepare UI and exact logo assets
         run: |
+          set -euo pipefail
           mkdir -p android/app/src/main/assets/ui android/app/src/main/res/drawable-nodpi
           cp -R ui/. android/app/src/main/assets/ui/
           cp rss-downloader-logo.png android/app/src/main/assets/rss-downloader-logo.png
           cp rss-downloader-logo.png android/app/src/main/res/drawable-nodpi/rss_downloader_logo.png
+
       - name: Build APK
-        run: gradle -p android assembleDebug --no-daemon
-      - name: Upload APK
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build-android.sh
+          ./scripts/build-android.sh
+
+      - name: Verify APK and checksum
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          sha256sum "$APK" | tee apk.sha256
+          ls -lh "$APK"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: rss-downloader-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            apk.sha256
