@@ -17,7 +17,8 @@
         <div><strong>RSS Downloader</strong><span>Fast. Organized. Controlled.</span></div>
       </div>
       <div class="top-actions">
-        <button id="appearanceButton" class="icon-button" aria-label="Change appearance" title="Appearance">◐</button>
+        <button id="appearanceButton" class="icon-button" aria-label="Toggle light/dark" title="Appearance">☾</button>
+        <button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button>
         <button id="downloadsButton" class="icon-button" aria-label="Downloads">↓ <span id="downloadBadge">0</span></button>
       </div>
     </header>
@@ -49,9 +50,20 @@
         <section><h3>Ongoing Downloads</h3><div id="ongoingList" class="download-list"></div></section>
         <section id="historySection" hidden><h3>All Downloads</h3><div id="historyList" class="download-list"></div></section>
       </section>
+
+      <section id="settingsView" class="view" hidden>
+        <div class="page-heading"><div><p class="eyebrow">RSS DOWNLOADER</p><h2>Settings</h2></div><button id="closeSettings" class="secondary">Done</button></div>
+        <section class="panel settings-panel">
+          <div class="setting-row"><div><strong>Appearance</strong><div class="meta">Use light or dark interface</div></div><label class="switch"><input id="themeSwitch" type="checkbox"><span></span></label></div>
+          <div class="setting-row"><div><strong>Auto-paste copied URL</strong><div class="meta">Detect a copied HTTP(S) URL when RSS Downloader is active</div></div><label class="switch"><input id="clipboardSwitch" type="checkbox" checked><span></span></label></div>
+          <div class="setting-row"><div><strong>Pre-loaded movie lists</strong><div class="meta">Show Tamil Movies and Tamil Dubbed Movies immediately</div></div><label class="switch"><input id="preloadSwitch" type="checkbox" checked><span></span></label></div>
+          <div class="setting-row"><div><strong>Tab order</strong><div class="meta">Drag the tabs to rearrange them</div></div><button id="resetTabs" class="secondary">Reset</button></div>
+          <div class="settings-about"><img src="../rss-downloader-logo.png" alt="RSS Downloader"><div><strong>RSS Downloader</strong><div class="meta">Razeen Secure Solution</div></div></div>
+        </section>
+      </section>
     </main>
   </div>
-  <script src="./android-runtime.js"></script>
+  <script src="../android-runtime.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
