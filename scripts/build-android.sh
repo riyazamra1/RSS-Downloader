@@ -19,6 +19,11 @@ fi
 JAVA_VERSION="$(java -version 2>&1 | awk -F '"' '/version/ {print $2; exit}')"
 echo "Java: ${JAVA_VERSION:-unknown}"
 
+# Stage the unchanged official logo into Android resources. Web assets are never packaged.
+mkdir -p "$ANDROID_DIR/app/src/main/res/drawable-nodpi"
+cp "$ROOT_DIR/rss-downloader-logo.png" "$ANDROID_DIR/app/src/main/res/drawable-nodpi/rss_downloader_logo.png"
+rm -rf "$ANDROID_DIR/app/src/main/assets/ui" "$ANDROID_DIR/app/src/main/assets/android-runtime.js"
+
 cd "$ANDROID_DIR"
 if [ ! -x ./gradlew ]; then
   GRADLE_CMD=""
