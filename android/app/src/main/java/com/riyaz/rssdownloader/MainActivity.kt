@@ -8,10 +8,13 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : AppCompatActivity() {
     private lateinit var clipboardManager: ClipboardManager
@@ -28,9 +31,22 @@ class MainActivity : AppCompatActivity() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
-        webView.webViewClient = WebViewClient()
+        webView.settings.allowFileAccess = false
+        webView.settings.allowContentAccess = false
+
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+        }
+
         webView.addJavascriptInterface(ClipboardBridge(), "AndroidClipboard")
-        webView.loadUrl("file:///android_asset/ui/index.html")
+        webView.loadUrl("https://appassets.androidplatform.net/assets/ui/index.html")
         setContentView(webView)
     }
 
