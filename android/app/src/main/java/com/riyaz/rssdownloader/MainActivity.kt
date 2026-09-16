@@ -34,10 +34,6 @@ class MainActivity : AppCompatActivity() {
     private var currentTab = TabOrder.SOCIAL
     private var lightMode = false
     private var tabOrder = TabOrder.defaults.toMutableList()
-    private val movieTitles = mapOf(
-        TabOrder.TAMIL to listOf("Maharaja" to 2024, "Amaran" to 2024, "Lubber Pandhu" to 2024, "Good Night" to 2023, "Parking" to 2023, "Tourist Family" to 2025, "Dragon" to 2025, "Retro" to 2025),
-        TabOrder.DUBBED to listOf("Kalki 2898 AD" to 2024, "Pushpa 2: The Rule" to 2024, "Hanuman" to 2024, "Leo" to 2023, "Salaar" to 2023, "Baahubali 2" to 2017, "RRR" to 2022, "Jailer" to 2023)
-    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,26 +72,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildBottomNav(): View = LinearLayout(this).apply {
-        gravity = Gravity.CENTER; setPadding(dp(7), dp(6), dp(7), dp(6)); background = rounded(surface(), 22); elevation = dp(12).toFloat()
-        tabOrder.forEach { id ->
-            val selected = id == currentTab
-            val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)
-                alpha = if (selected) 1f else 0.78f; alpha = if (selected) 1f else 0.78f }
-            item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
-            item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
-            item.setOnClickListener {
-                if (currentTab == id) return@setOnClickListener
-                currentTab = id
-                item.animate().scaleX(0.94f).scaleY(0.94f).setDuration(70).withEndAction {
-                    item.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
-                }.start()
-                showHome()
-            }
-            addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
-        }
-        addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(text("⚙", 19, muted(), false)); addView(text("Settings", 9, muted(), true)); setOnClickListener { showSettings() } }, LinearLayout.LayoutParams(0, dp(58), 1f))
-        layoutParams = LinearLayout.LayoutParams(-1, dp(78)).apply { setMargins(dp(10), 0, dp(10), 0) }
+    gravity = Gravity.CENTER; setPadding(dp(7), dp(6), dp(7), dp(6)); background = rounded(surface(), 22); elevation = dp(12).toFloat()
+    tabOrder.forEach { id ->
+        val selected = id == currentTab
+        val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16); alpha = if (selected) 1f else 0.78f }
+        item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
+        item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
+        item.setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
+        item.setOnLongClickListener { showTabOrderDialog(); true }
+        addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
     }
+    addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(text("⚙", 19, muted(), false)); addView(text("Settings", 9, muted(), true)); setOnClickListener { showSettings() } }, LinearLayout.LayoutParams(0, dp(58), 1f))
+    layoutParams = LinearLayout.LayoutParams(-1, dp(78)).apply { setMargins(dp(10), 0, dp(10), 0) }
+}
+
+private fun showTabOrderDialog() {
+    val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(8)) }
+    tabOrder.forEachIndexed { index, id ->
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
+        row.addView(text("${index + 1}. ${tabLabel(id)}", 15, textColor(), true), LinearLayout.LayoutParams(0, dp(48), 1f))
+        row.addView(secondaryButton("↑") { if (index > 0) { val x = tabOrder.removeAt(index); tabOrder.add(index - 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
+        row.addView(secondaryButton("↓") { if (index < tabOrder.lastIndex) { val x = tabOrder.removeAt(index); tabOrder.add(index + 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)))
+        box.addView(row)
+    }
+    box.addView(secondaryButton("Reset default order") { prefs.edit().remove("tabOrder").apply(); recreate() }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(10) })
+    android.app.AlertDialog.Builder(this).setTitle("Rearrange tabs").setView(box).setNegativeButton("Close", null).show()
+}
 
     private fun showHome() {
         content.removeAllViews()
@@ -119,15 +121,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildMovie(box: LinearLayout, tab: String) {
-        box.addView(text(tabLabel(tab).uppercase(Locale.US), 10, Color.rgb(140, 156, 255), true).apply { setPadding(dp(18), dp(12), 0, dp(5)) })
-        box.addView(text("Tamil movie search", 28, textColor(), true).apply { setPadding(dp(18), 0, 0, dp(12)) })
-        val search = EditText(this).apply { hint = "Search movies…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); background = rounded(bg(), 14); setPadding(dp(16), 0, dp(16), 0) }
-        val searchRow = LinearLayout(this).apply { setPadding(dp(18), 0, dp(18), dp(12)) }
-        searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f)); searchRow.addView(primaryButton("Search") { movieSearch(tab, search.text.toString()) }, LinearLayout.LayoutParams(dp(110), dp(52)).apply { setMargins(dp(10), 0, 0, 0) }); box.addView(searchRow)
-        val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, dp(12), 0) }
-        movieTitles[tab].orEmpty().chunked(2).forEach { pair -> val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; pair.forEach { (title, year) -> row.addView(movieCard(title, year, tab), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) }) }; if (pair.size == 1) row.addView(Space(this), LinearLayout.LayoutParams(0, 1, 1f)); grid.addView(row) }
-        box.addView(grid)
-    }
+    box.addView(text(tabLabel(tab).uppercase(Locale.US), 10, Color.rgb(140, 156, 255), true).apply { setPadding(dp(18), dp(12), 0, dp(5)) })
+    box.addView(text("Latest movies", 28, textColor(), true).apply { setPadding(dp(18), 0, 0, dp(12)) })
+    val search = EditText(this).apply { hint = "Search movies…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); background = rounded(bg(), 14); setPadding(dp(16), 0, dp(16), 0) }
+    val searchRow = LinearLayout(this).apply { setPadding(dp(18), 0, dp(18), dp(12)) }
+    searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
+    searchRow.addView(primaryButton("Search") { movieSearch(tab, search.text.toString()) }, LinearLayout.LayoutParams(dp(110), dp(52)).apply { setMargins(dp(10), 0, 0, 0) })
+    box.addView(searchRow)
+    val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, dp(12), 0) }
+    box.addView(grid)
+    loadLatestMovies(tab, grid)
+}
+
+private fun loadLatestMovies(tab: String, grid: LinearLayout) {
+    grid.removeAllViews()
+    grid.addView(text("Loading latest movies…", 13, muted(), false).apply { setPadding(dp(6), dp(12), dp(6), dp(12)) })
+    if (!api.configured()) { grid.removeAllViews(); grid.addView(text("RSS Core is not configured.", 13, muted(), false)); return }
+    api.search(tab, "") { result -> runOnUiThread {
+        grid.removeAllViews()
+        result.onSuccess { items ->
+            if (items.isEmpty()) { grid.addView(text("No latest movies returned.", 13, muted(), false)); return@onSuccess }
+            items.forEach { item ->
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                row.addView(movieCard(item.title, item.year ?: 2026, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+                grid.addView(row)
+            }
+        }.onFailure { grid.addView(text(it.message ?: "Failed to load latest movies.", 13, muted(), false)) }
+    }}
+}
 
     private fun movieCard(title: String, year: Int, tab: String): View = panel().apply {
         orientation = LinearLayout.VERTICAL
@@ -144,7 +165,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun movieSearch(tab: String, query: String) {
-        val q = query.trim(); if (q.isBlank()) { toast("Enter a movie name."); return }; if (!api.configured()) { toast("RSS Core is not configured."); return }
+        val q = query.trim(); if (!api.configured()) { if (q.isBlank()) { showHome(); return }; toast("RSS Core is not configured."); return }
         content.removeAllViews(); val loading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(22), dp(22), dp(22)) }; loading.addView(text("Searching…", 18, textColor(), true)); content.addView(ScrollView(this).apply { addView(loading) })
         api.search(tab, q) { result -> runOnUiThread {
             result.onSuccess { results ->
