@@ -20,10 +20,9 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun analyze(url: String, callback: (Result<Analysis>) -> Unit) = executor.execute {
         callback(runCatching {
-            val json = request("/api/downloader/analyze", "POST", JSONObject().put("url", url))
-            val requestId = json.optString("requestId")
+            val json = requestObject("/api/downloader/analyze", "POST", JSONObject().put("url", url))
             Analysis(
-                requestId,
+                json.optString("requestId"),
                 json.optString("title", "RSS Download"),
                 json.optString("normalizedUrl", url),
                 json.optString("thumbnailUrl", "").ifBlank { null },
@@ -34,7 +33,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun search(tab: String, query: String, callback: (Result<List<SearchResult>>) -> Unit) = executor.execute {
         callback(runCatching {
-            val json = request("/api/downloader/search", "POST", JSONObject().put("tab", tab).put("query", query))
+            val json = requestObject("/api/downloader/search", "POST", JSONObject().put("tab", tab).put("query", query))
             val results = mutableListOf<SearchResult>()
             val array = json.optJSONArray("results") ?: JSONArray()
             for (i in 0 until array.length()) {
@@ -55,17 +54,15 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun listMediaOptions(requestId: String, callback: (Result<List<MediaOption>>) -> Unit) = executor.execute {
         callback(runCatching {
-            val json = request("/api/downloader/media-options/${enc(requestId)}", "GET", null)
-            if (json.has("mediaOptions")) mediaOptions(json.optJSONArray("mediaOptions"))
-            else if (json.has("options")) mediaOptions(json.optJSONArray("options"))
-            else if (json.has("results")) mediaOptions(json.optJSONArray("results"))
-            else mediaOptions(json.optJSONArray(null))
+            val text = requestText("/api/downloader/media-options/${enc(requestId)}", "GET", null)
+            val array = JSONArray(text)
+            mediaOptions(array)
         })
     }
 
     fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute {
         callback(runCatching {
-            parseJob(request("/api/downloader/download", "POST", JSONObject()
+            parseJob(requestObject("/api/downloader/download", "POST", JSONObject()
                 .put("requestId", requestId)
                 .put("mediaOptionId", optionId)
                 .put("authorizationApproved", true)))
@@ -74,14 +71,14 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun listDownloads(callback: (Result<List<Job>>) -> Unit) = executor.execute {
         callback(runCatching {
-            val json = request("/api/downloader/downloads", "GET", null)
+            val json = requestObject("/api/downloader/downloads", "GET", null)
             val array = json.optJSONArray("jobs") ?: JSONArray()
             buildList { for (i in 0 until array.length()) add(parseJob(array.getJSONObject(i))) }
         })
     }
 
     fun cancel(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute {
-        callback(runCatching { parseJob(request("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) })
+        callback(runCatching { parseJob(requestObject("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) })
     }
 
     private fun mediaOptions(array: JSONArray?): List<MediaOption> {
@@ -122,7 +119,9 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     private fun jsonStringList(a: JSONArray?): List<String> = if (a == null) emptyList() else buildList { for (i in 0 until a.length()) add(a.optString(i)) }
     private fun enc(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
 
-    private fun request(path: String, method: String, body: JSONObject?): JSONObject {
+    private fun requestObject(path: String, method: String, body: JSONObject?): JSONObject = JSONObject(requestText(path, method, body))
+
+    private fun requestText(path: String, method: String, body: JSONObject?): String {
         if (!configured()) throw IllegalStateException("RSS host API is not configured.")
         val connection = (URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection)
         connection.requestMethod = method
@@ -140,6 +139,6 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         connection.disconnect()
         if (code !in 200..299) throw IllegalStateException("RSS host API request failed ($code). ${text.take(180)}")
-        return if (text.isBlank()) JSONObject() else JSONObject(text)
+        return text
     }
 }
