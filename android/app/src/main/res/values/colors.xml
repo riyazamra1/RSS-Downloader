@@ -1,3 +1,4 @@
 <resources>
-    <color name="splash_background">#070B16</color>
+    <!-- The Android launch splash is intentionally light so the first frame is clean even when the saved app appearance is dark. -->
+    <color name="splash_background">#F4F6FB</color>
 </resources>
