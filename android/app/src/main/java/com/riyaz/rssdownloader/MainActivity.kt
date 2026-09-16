@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity() {
             result.onSuccess { analysis ->
                 stateText.text = analysis.title
                 renderThumbnail(mediaPanel, analysis.thumbnailUrl, analysis.title)
-                renderOptions(analysis.requestId, analysis.mediaOptions)
+                renderOptions(mediaPanel, analysis.requestId, analysis.mediaOPtions)
             }.onFailure { stateText.text = it.message ?: "Analysis failed." }
         }}
     }
@@ -204,6 +204,8 @@ class MainActivity : AppCompatActivity() {
             result.onSuccess { results ->
                 val panel = panel().apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(12), dp(18), dp(12)) }
                 panel.addView(text("Search results", 18, textColor(), true))
+                val optionsPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+                panel.addView(optionsPanel)
                 if (results.isEmpty()) panel.addView(text("No results returned by RSS Core.", 13, muted(), false).apply { setPadding(0, dp(12), 0, dp(8)) })
                 results.forEach { item ->
                     val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(10), 0, dp(10)) }
@@ -217,9 +219,21 @@ class MainActivity : AppCompatActivity() {
                         if (item.qualities.isNotEmpty()) addView(text(item.qualities.joinToString(" • "), 10, muted(), false))
                     }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) })
                     row.addView(primaryButton("Select") {
-                        if (item.mediaOptions.isNotEmpty()) renderOptions(item.requestId ?: item.id, item.mediaOptions)
-                        else toast("No authorized quality options available.")
-                    })
+                        val requestId = item.requestId
+                        if (item.mediaOptions.isNotEmpty() && requestId != null) {
+                      renderOptions(optionsPanel, requestId, item.mediaOptions)
+                        } else if (requestId != null) {
+                            optionsPanel.removeAllViews()
+                            optionsPanel.addView(text("Loading quality options…", 13, muted(), false))
+                            api.listMediaOptions(requestId) { optionsResult -> runOnUiThread {
+                                optionsResult.onSuccess { options -> renderOptions(optionsPanel, requestId, options) }
+                                    .onFailure { optionsPanel.removeAllViews(); optionsPanel.addView(text(it.message ?: "Failed to load quality options.", 13, muted(), false)) }
+                            }}
+                        } else {
+                            optionsPanel.removeAllViews()
+                            optionsPanel.addView(text("RSS Core did not return a request ID for this result.", 13, muted(), false))
+                        }
+                          })
                     panel.addView(row)
                 }
                 content.removeAllViews()
@@ -228,14 +242,14 @@ class MainActivity : AppCompatActivity() {
         }}
     }
 
-    private fun renderOptions(requestId: String, options: List<NativeHostApi.MediaOption>) {
-        mediaPanel.visibility = View.VISIBLE
-        mediaPanel.removeAllViews()
+    private fun renderOptions(target: LinearLayout, requestId: String, options: List<NativeHostApi.MediaOption>) {
+        target.visibility = View.VISIBLE
+        target.removeAllViews()
         if (options.isEmpty()) {
-            mediaPanel.addView(text("RSS Core returned no authorized formats.", 13, muted(), false))
+            target.addView(text("RSS Core returned no authorized formats.", 13, muted(), false))
             return
         }
-        mediaPanel.addView(text("Choose an authorized format", 13, muted(), false))
+        target.addView(text("Choose an authorized format", 13, muted(), false))
         options.forEach { option ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(13), 0, dp(13)) }
             row.addView(LinearLayout(this@MainActivity).apply {
@@ -244,7 +258,7 @@ class MainActivity : AppCompatActivity() {
                 addView(text(listOfNotNull(option.format, option.quality, option.sizeBytes?.let(::formatBytes)).joinToString(" • "), 11, muted(), false))
             }, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(primaryButton("Download") { createDownload(requestId, option.id) })
-            mediaPanel.addView(row)
+            target.addView(row)
         }
     }
 
@@ -349,8 +363,10 @@ class MainActivity : AppCompatActivity() {
         if (cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) != true) return
         val value = clip.getItemAt(0).coerceToText(this).toString().trim()
         if (!value.startsWith("http://") && !value.startsWith("https://")) return
+        val tabChanged = currentTab != TabOrder.SOCIAL
         currentTab = TabOrder.SOCIAL
-        if (urlInput.text.toString() != value) urlInput.setText(value)
+        if (tabChanged) showHome()
+        if (::urlInput.isInitialized && urlInput.text.toString() != value) urlInput.setText(value)
         if (autoAnalyze && prefs.getString("lastClipboardUrl", "") != value) {
             prefs.edit().putString("lastClipboardUrl", value).apply()
             urlInput.postDelayed({ if (!isFinishing && currentTab == TabOrder.SOCIAL) analyzeUrl() }, 180)
