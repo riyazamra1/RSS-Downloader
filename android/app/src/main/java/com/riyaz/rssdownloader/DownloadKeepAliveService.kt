@@ -28,11 +28,8 @@ class DownloadKeepAliveService : Service() {
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var stopping = false
     private val api by lazy {
-        val prefs = getSharedPreferences("rss-downloader", MODE_PRIVATE)
-        NativeHostApi(
-            prefs.getString("hostUrl", BuildConfig.RSS_HOST_BASE_URL).orEmpty(),
-            prefs.getString("hostToken", BuildConfig.RSS_HOST_ACCESS_TOKEN).orEmpty().ifBlank { null },
-        )
+        // The host is application-controlled. Never read legacy user-editable host/token preferences.
+        NativeHostApi(BuildConfig.RSS_HOST_BASE_URL, BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null })
     }
 
     override fun onCreate() {
@@ -69,10 +66,7 @@ class DownloadKeepAliveService : Service() {
                         val progress = (job.progress ?: 0).coerceIn(0, 100)
                         val title = job.title ?: "RSS Downloader"
                         val text = if (active.size == 1) "$title • $progress%" else "${active.size} downloads • $progress%"
-                        getSystemService(NotificationManager::class.java).notify(
-                            NOTIFICATION_ID,
-                            buildNotification(text, progress),
-                        )
+                        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text, progress))
                         schedulePoll()
                     }
                 }.onFailure {
