@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-apk:
-    runs-on: [self-hosted, rss, ubuntu, ai]
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - name: Checkout
