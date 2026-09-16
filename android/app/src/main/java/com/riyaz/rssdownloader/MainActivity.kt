@@ -103,6 +103,7 @@ class MainActivity : AppCompatActivity() {
                 alpha = if (selected) 1f else 0.78f
                 alpha = if (selected) 1f else 0.78f
                 alpha = if (selected) 1f else 0.78f
+                alpha = if (selected) 1f else 0.78f
             }
             item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
             item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
