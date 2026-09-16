@@ -29,17 +29,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var urlInput: EditText
     private lateinit var stateText: TextView
     private lateinit var mediaPanel: LinearLayout
-    private var currentTab = "social-downloader"
+    private var currentTab = TabOrder.SOCIAL
     private var lightMode = false
-    private val tabs = listOf("social-downloader", "tamil-movies", "tamil-dubbed-movies")
+    private var tabOrder = TabOrder.defaults.toMutableList()
     private val movieTitles = mapOf(
-        "tamil-movies" to listOf("Maharaja" to 2024, "Amaran" to 2024, "Lubber Pandhu" to 2024, "Good Night" to 2023, "Parking" to 2023, "Tourist Family" to 2025, "Dragon" to 2025, "Retro" to 2025),
-        "tamil-dubbed-movies" to listOf("Kalki 2898 AD" to 2024, "Pushpa 2: The Rule" to 2024, "Hanuman" to 2024, "Leo" to 2023, "Salaar" to 2023, "Baahubali 2" to 2017, "RRR" to 2022, "Jailer" to 2023),
+        TabOrder.TAMIL to listOf("Maharaja" to 2024, "Amaran" to 2024, "Lubber Pandhu" to 2024, "Good Night" to 2023, "Parking" to 2023, "Tourist Family" to 2025, "Dragon" to 2025, "Retro" to 2025),
+        TabOrder.DUBBED to listOf("Kalki 2898 AD" to 2024, "Pushpa 2: The Rule" to 2024, "Hanuman" to 2024, "Leo" to 2023, "Salaar" to 2023, "Baahubali 2" to 2017, "RRR" to 2022, "Jailer" to 2023),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lightMode = prefs.getBoolean("light", false)
+        tabOrder = TabOrder.load(prefs.getString("tabOrder", null))
         applyTheme()
         startDownloadKeepAlive()
         requestNotificationPermissionIfNeeded()
@@ -87,14 +88,20 @@ class MainActivity : AppCompatActivity() {
         setPadding(dp(7), dp(6), dp(7), dp(6))
         background = rounded(surface(), 22)
         elevation = dp(12).toFloat()
-        val labels = listOf("⇩" to "Social Downloader", "🎬" to "Tamil Movie", "▶" to "Tamil Dubbed Movie", "⚙" to "Settings")
+        val labels = tabOrder.map { it to tabLabel(it) }
         labels.forEachIndexed { index, pair ->
-            val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (index == 0) surface2() else Color.TRANSPARENT, 16) }
-            item.addView(text(pair.first, 19, textColor(), false).apply { gravity = Gravity.CENTER })
-            item.addView(text(pair.second, 9, if (index == 0) textColor() else muted(), true).apply { gravity = Gravity.CENTER })
-            item.setOnClickListener { if (index == 3) showSettings() else { currentTab = tabs[index]; showHome() } }
+            val selected = pair.first == currentTab
+            val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16) }
+            item.addView(text(if (pair.first == TabOrder.SOCIAL) "⇩" else if (pair.first == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false).apply { gravity = Gravity.CENTER })
+            item.addView(text(pair.second, 9, if (selected) textColor() else muted(), true).apply { gravity = Gravity.CENTER })
+            item.setOnClickListener { currentTab = pair.first; showHome() }
             addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
         }
+        val settings = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = ColorDrawableCompat.transparent() }
+        settings.addView(text("⚙", 19, muted(), false).apply { gravity = Gravity.CENTER })
+        settings.addView(text("Settings", 9, muted(), true).apply { gravity = Gravity.CENTER })
+        settings.setOnClickListener { showSettings() }
+        addView(settings, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
         layoutParams = FrameLayout.LayoutParams(-1, dp(78), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { setMargins(dp(10), 0, dp(10), dp(8)) }
     }
 
@@ -126,7 +133,7 @@ class MainActivity : AppCompatActivity() {
         content.removeAllViews()
         val scroll = ScrollView(this).apply { isFillViewport = true }
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(94), dp(10), dp(18), dp(18)) }
-        if (currentTab == "social-downloader") buildSocial(box) else buildMovie(box, currentTab)
+        if (currentTab == TabOrder.SOCIAL) buildSocial(box) else buildMovie(box, currentTab)
         scroll.addView(box)
         content.addView(scroll)
     }
@@ -244,9 +251,29 @@ class MainActivity : AppCompatActivity() {
         box.addView(settingRow("Appearance", "Use light or dark interface", lightMode) { lightMode = it; prefs.edit().putBoolean("light", it).apply(); applyTheme(); showSettings() })
         box.addView(settingRow("Auto-paste copied URL", "Detect a copied HTTP(S) URL when RSS Downloader is active", prefs.getBoolean("clipboard", true)) { prefs.edit().putBoolean("clipboard", it).apply() })
         box.addView(settingRow("Pre-loaded movie lists", "Show Tamil Movies and Tamil Dubbed Movies immediately", prefs.getBoolean("preload", true)) { prefs.edit().putBoolean("preload", it).apply() })
-        box.addView(secondaryButton("Reset tab order") { prefs.edit().remove("tabOrder").apply(); toast("Tab order reset") }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
+        box.addView(text("TAB ORDER", 10, muted(), true).apply { setPadding(dp(18), dp(18), 0, dp(6)) })
+        box.addView(text("Rearrange the three main tabs. The order is saved on this device.", 12, muted(), false).apply { setPadding(dp(18), 0, dp(18), dp(8)) })
+        tabOrder.forEachIndexed { index, id ->
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(8), dp(8), dp(8)); background = rounded(surface(), 14) }
+            row.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 20, textColor(), false).apply { gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(dp(36), dp(48)) })
+            row.addView(text(tabLabel(id), 14, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(secondaryButton("↑") { moveTab(index, -1) }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4),0,dp(4),0) })
+            row.addView(secondaryButton("↓") { moveTab(index, 1) }, LinearLayout.LayoutParams(dp(48), dp(44)))
+            box.addView(row, LinearLayout.LayoutParams(-1, dp(64)).apply { setMargins(dp(18), dp(4), dp(18), dp(4)) })
+        }
+        box.addView(secondaryButton("Reset tab order") { tabOrder = TabOrder.defaults.toMutableList(); prefs.edit().remove("tabOrder").apply(); currentTab = TabOrder.SOCIAL; showSettings() }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
         box.addView(LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18),dp(18),dp(18),dp(18)); addView(logoView(42)); addView(text("RSS Downloader\nRazeen Secure Solution", 14, textColor(), true).apply { setPadding(dp(12),0,0,0) }) }, LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(10) })
         scroll.addView(box); content.addView(scroll)
+    }
+
+    private fun moveTab(index: Int, delta: Int) {
+        val target = index + delta
+        if (target !in tabOrder.indices) return
+        val moved = tabOrder.removeAt(index)
+        tabOrder.add(target, moved)
+        prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply()
+        currentTab = moved
+        showSettings()
     }
 
     private fun settingRow(title: String, subtitle: String, checked: Boolean, onChanged: (Boolean)->Unit): View = LinearLayout(this).apply {
@@ -262,18 +289,18 @@ class MainActivity : AppCompatActivity() {
         val text = cm.primaryClip?.takeIf { cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true }?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
         if (text.startsWith("http://") || text.startsWith("https://")) {
             val previous = prefs.getString("lastClipboardUrl", "")
-            currentTab = "social-downloader"
+            currentTab = TabOrder.SOCIAL
             if (urlInput.text.toString() != text) urlInput.setText(text)
             if (autoAnalyze && previous != text) {
                 prefs.edit().putString("lastClipboardUrl", text).apply()
-                urlInput.postDelayed({ if (!isFinishing && currentTab == "social-downloader") analyzeUrl() }, 120)
+                urlInput.postDelayed({ if (!isFinishing && currentTab == TabOrder.SOCIAL) analyzeUrl() }, 120)
             }
         }
     }
 
     private fun toggleMenu() { val lp = sideMenu.layoutParams as FrameLayout.LayoutParams; lp.width = if (lp.width == dp(76)) dp(300) else dp(76); sideMenu.layoutParams = lp }
     private fun closeMenu() { val lp = sideMenu.layoutParams as FrameLayout.LayoutParams; lp.width=dp(76); sideMenu.layoutParams=lp }
-    private fun tabLabel(id:String) = when(id){"social-downloader"->"Social Downloader";"tamil-movies"->"Tamil Movies";else->"Tamil Dubbed Movies"}
+    private fun tabLabel(id:String) = when(id){TabOrder.SOCIAL->"Social Downloader";TabOrder.TAMIL->"Tamil Movies";else->"Tamil Dubbed Movies"}
     private fun applyTheme(){ window.statusBarColor=bg(); window.navigationBarColor=bg(); if(::root.isInitialized) root.setBackgroundColor(bg()) }
     private fun bg()=Color.parseColor(if(lightMode)"#F4F6FB" else "#070B16")
     private fun surface()=Color.parseColor(if(lightMode)"#FFFFFF" else "#0D1324")
@@ -294,4 +321,8 @@ class MainActivity : AppCompatActivity() {
     private fun toast(message:String)=Toast.makeText(this,message,Toast.LENGTH_SHORT).show()
     private fun startDownloadKeepAlive(){ContextCompat.startForegroundService(this,DownloadKeepAliveService.startIntent(this))}
     private fun requestNotificationPermissionIfNeeded(){if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),4102)}
+}
+
+private object ColorDrawableCompat {
+    val transparent: android.graphics.drawable.Drawable = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
 }
