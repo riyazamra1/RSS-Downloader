@@ -4,29 +4,34 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Intent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import java.util.Locale
+import java.util.concurrent.Executors
 
-/**
- * Keeps RSS Downloader's process alive while downloads may be running.
- * The service is intentionally lightweight; the downloader runtime remains
- * the source of truth for job state and persistence.
- */
+/** Runs only while at least one download is active and owns the progress notification. */
 class DownloadKeepAliveService : Service() {
     companion object {
         const val ACTION_START = "com.riyaz.rssdownloader.action.START_DOWNLOAD_KEEP_ALIVE"
         const val ACTION_STOP = "com.riyaz.rssdownloader.action.STOP_DOWNLOAD_KEEP_ALIVE"
         private const val CHANNEL_ID = "rss_downloader_downloads"
         private const val NOTIFICATION_ID = 4101
+        private val ACTIVE_STATUSES = setOf("QUEUED", "PENDING", "STARTING", "DOWNLOADING", "PROCESSING", "RUNNING")
 
-        fun startIntent(context: Context): Intent = Intent(context, DownloadKeepAliveService::class.java)
-            .setAction(ACTION_START)
+        fun startIntent(context: Context): Intent = Intent(context, DownloadKeepAliveService::class.java).setAction(ACTION_START)
+        fun stopIntent(context: Context): Intent = Intent(context, DownloadKeepAliveService::class.java).setAction(ACTION_STOP)
+    }
 
-        fun stopIntent(context: Context): Intent = Intent(context, DownloadKeepAliveService::class.java)
-            .setAction(ACTION_STOP)
+    private val executor = Executors.newSingleThreadExecutor()
+    private val api by lazy {
+        val prefs = getSharedPreferences("rss-downloader", MODE_PRIVATE)
+        NativeHostApi(
+            prefs.getString("hostUrl", BuildConfig.RSS_HOST_BASE_URL).orEmpty(),
+            prefs.getString("hostToken", BuildConfig.RSS_HOST_ACCESS_TOKEN).orEmpty().ifBlank { null },
+        )
     }
 
     override fun onCreate() {
@@ -35,38 +40,72 @@ class DownloadKeepAliveService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return START_NOT_STICKY
-            }
-            else -> startForeground(NOTIFICATION_ID, buildNotification())
+        if (intent?.action == ACTION_STOP) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
         }
-        return START_STICKY
+        startForeground(NOTIFICATION_ID, buildNotification("Starting download…", 0))
+        pollDownloads()
+        return START_NOT_STICKY
     }
 
-    private fun buildNotification(): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun pollDownloads() {
+        executor.execute {
+            api.listDownloads { result ->
+                result.onSuccess { jobs ->
+                    val active = jobs.filter { it.status.uppercase(Locale.US) in ACTIVE_STATUSES }
+                    if (active.isEmpty()) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    } else {
+                        val job = active.first()
+                        val progress = (job.progress ?: 0).coerceIn(0, 100)
+                        val title = job.title ?: "RSS Downloader"
+                        val text = if (active.size == 1) "$title • $progress%" else "${active.size} downloads • $progress%"
+                        getSystemService(NotificationManager::class.java).notify(
+                            NOTIFICATION_ID,
+                            buildNotification(text, progress),
+                        )
+                        schedulePoll()
+                    }
+                }.onFailure {
+                    schedulePoll()
+                }
+            }
+        }
+    }
+
+    private fun schedulePoll() {
+        executor.execute {
+            try { Thread.sleep(5000) } catch (_: InterruptedException) { return@execute }
+            if (!isStopped) pollDownloads()
+        }
+    }
+
+    private fun buildNotification(text: String, progress: Int): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(R.drawable.rss_downloader_logo)
         .setContentTitle("RSS Downloader")
-        .setContentText("Downloads are running in the background")
+        .setContentText(text)
         .setOngoing(true)
+        .setOnlyAlertOnce(true)
         .setCategory(NotificationCompat.CATEGORY_PROGRESS)
         .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setProgress(100, progress, false)
         .build()
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                "RSS Downloader downloads",
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = "Keeps RSS Downloader active while downloads are running."
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "RSS Downloader downloads", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Shows RSS Downloader progress only while downloads are running."
             },
         )
+    }
+
+    override fun onDestroy() {
+        executor.shutdownNow()
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
