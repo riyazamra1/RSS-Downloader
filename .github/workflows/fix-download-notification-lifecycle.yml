@@ -1,0 +1,35 @@
+name: Fix download notification lifecycle
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch foreground service lifecycle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
+          s = p.read_text()
+          s = s.replace('        startDownloadKeepAlive()\n        requestNotificationPermissionIfNeeded()\n', '        requestNotificationPermissionIfNeeded()\n')
+          s = s.replace('            result.onSuccess { showDownloads() }.onFailure { toast(it.message ?: "Download failed.") }', '            result.onSuccess {\n                requestNotificationPermissionIfNeeded()\n                startDownloadKeepAlive()\n                showDownloads()\n            }.onFailure { toast(it.message ?: "Download failed.") }')
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(android): start foreground service only for downloads'
+          git push
