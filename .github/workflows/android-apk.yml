@@ -55,6 +55,18 @@ jobs:
           cp rss-downloader-logo.png android/app/src/main/res/drawable-nodpi/rss_downloader_logo.png
           rm -rf android/app/src/main/assets/ui android/app/src/main/assets/android-runtime.js
 
+      - name: Normalize Kotlin UI compatibility
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt")
+          text = path.read_text()
+          text = text.replace("hintTextColor = muted()", "setHintTextColor(muted())")
+          text = text.replace("background = ColorDrawableCompat.transparent()", "background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)")
+          path.write_text(text)
+          PY
+
       - name: Build APK
         run: |
           set -euo pipefail
