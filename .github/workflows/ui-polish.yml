@@ -1,0 +1,100 @@
+name: RSS Downloader UI Polish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ui-polish.yml'
+      - 'android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply UI and clipboard corrections
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
+          s = p.read_text()
+          s = s.replace('        hero.addView(text("Paste a link.\\nRSS handles the rest.", 34, textColor(), true).apply { setPadding(0, dp(4), 0, dp(8)) })\n', '')
+          s = s.replace('        hero.addView(text("Copied HTTP(S) links are detected automatically while RSS Downloader is active.", 13, muted(), false))\n', '')
+          start = s.index('    private fun buildBottomNav(): View = LinearLayout(this).apply {')
+          end = s.index('    private fun showTabOrderDialog()', start)
+          nav = '''    private fun buildBottomNav(): View = LinearLayout(this).apply {
+        gravity = Gravity.CENTER
+        setPadding(dp(8), dp(6), dp(8), dp(6))
+        background = rounded(surface(), 20)
+        elevation = dp(10).toFloat()
+        tabOrder.forEach { id ->
+            val selected = id == currentTab
+            val item = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)
+                setPadding(dp(4), dp(6), dp(4), dp(5))
+                setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
+                setOnLongClickListener { showTabOrderDialog(); true }
+            }
+            val icon = when (id) {
+                TabOrder.SOCIAL -> R.drawable.ic_nav_download
+                TabOrder.TAMIL -> R.drawable.ic_nav_movie
+                else -> R.drawable.ic_nav_dubbed
+            }
+            item.addView(iconView(icon, selected), LinearLayout.LayoutParams(dp(24), dp(24)))
+            item.addView(text(tabShortLabel(id), 9, if (selected) textColor() else muted(), true))
+            addView(item, LinearLayout.LayoutParams(0, dp(56), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
+        }
+        val settings = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(6), dp(4), dp(5))
+            setOnClickListener { showSettings() }
+            addView(iconView(R.drawable.ic_nav_settings, false), LinearLayout.LayoutParams(dp(24), dp(24)))
+            addView(text("Settings", 9, muted(), true))
+        }
+        addView(settings, LinearLayout.LayoutParams(0, dp(56), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
+        layoutParams = LinearLayout.LayoutParams(-1, dp(68)).apply { setMargins(dp(10), 0, dp(10), 0) }
+    }
+
+'''
+          s = s[:start] + nav + s[end:]
+          s = s.replace('        if (cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) != true) return\n', '')
+          helper = '''    private fun iconView(resId: Int, selected: Boolean): ImageView = ImageView(this).apply {
+        setImageResource(resId)
+        imageTintList = android.content.res.ColorStateList.valueOf(if (selected) accent() else muted())
+        contentDescription = null
+    }
+
+'''
+          if 'private fun iconView(' not in s:
+              s = s.replace('    private fun showTabOrderDialog()', helper + '    private fun showTabOrderDialog()', 1)
+          p.write_text(s)
+
+          res = Path('android/app/src/main/res/drawable')
+          res.mkdir(parents=True, exist_ok=True)
+          icons = {
+            'ic_nav_download.xml': '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" android:pathData="M5,4h14v3H5zM5,9h14v3H5zM5,14h9v3H5zM17,14v3h3v2h-3v3l-4,-4z"/></vector>',
+            'ic_nav_movie.xml': '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" android:pathData="M4,5h16v14H4zM7,3l2,2M12,3l2,2M17,3l2,2M9,9v6l6,-3z"/></vector>',
+            'ic_nav_dubbed.xml': '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" android:pathData="M4,5h16v12H9l-5,4zM9,9h6v2H9zM9,13h4v2H9z"/></vector>',
+            'ic_nav_settings.xml': '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" android:pathData="M19.4,13a7.7,7.7 0,0 0,0 -2l2,-1.5 -2,-3.4 -2.4,1a7.5,7.5 0,0 0,-1.7 -1L15,3h-4l-0.4,3.1a7.5,7.5 0,0 0,-1.7 1l-2.4,-1 -2,3.4 2,1.5a7.7,7.7 0,0 0,0 2l-2,1.5 2,3.4 2.4,-1a7.5,7.5 0,0 0,1.7,1L11,21h4l0.4,-3.1a7.5,7.5 0,0 0,1.7,-1l2.4,1 2,-3.4zM13,15.5A3.5,3.5 0,1 1,13,8.5a3.5,3.5 0,0 1,0,7z"/></vector>'
+          }
+          for name, content in icons.items():
+              (res / name).write_text(content)
+          PY
+          git diff --check
+          git config user.name 'RSS Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          if ! git diff --quiet; then
+            git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt android/app/src/main/res/drawable/ic_nav_*.xml
+            git commit -m 'fix(android): polish navigation icons and clipboard behavior'
+            git push
+          fi
