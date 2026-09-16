@@ -11,24 +11,21 @@ android {
         applicationId = "com.riyaz.rssdownloader"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
-        buildConfigField("String", "RSS_HOST_BASE_URL", "\"\"")
+        versionCode = 3
+        versionName = "3.0"
+        // Public RSS Core base URL. No admin/server token is embedded in the APK.
+        buildConfigField("String", "RSS_HOST_BASE_URL", "\"https://rsscore.cv\"")
         buildConfigField("String", "RSS_HOST_ACCESS_TOKEN", "\"\"")
     }
 
-    buildFeatures {
-        buildConfig = true
-    }
+    buildFeatures { buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlinOptions { jvmTarget = "17" }
 }
 
 dependencies {
