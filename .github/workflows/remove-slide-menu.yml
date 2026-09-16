@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Remove drawer UI from native Android screen
+      - name: Repair native Android functional flows
         shell: python
         run: |
           from pathlib import Path
@@ -33,11 +33,51 @@ jobs:
           s = s.replace('setPadding(dp(94), dp(18), dp(18), dp(18))', 'setPadding(dp(18), dp(18), dp(18), dp(18))')
           s = s.replace('showDownloads(); closeMenu()', 'showDownloads()')
           s = s.replace('showSettings(); closeMenu()', 'showSettings()')
+
+          start = s.find('    private fun renderOptions(requestId: String, options: List<NativeHostApi.MediaOption>) {')
+          end = s.find('    private fun createDownload(', start)
+          if start != -1 and end != -1:
+              replacement = '''    private fun renderOptions(requestId: String, options: List<NativeHostApi.MediaOption>) {
+                  val target = if (mediaPanel.parent != null) mediaPanel else (content.findViewWithTag<LinearLayout>("movie-options") ?: LinearLayout(this).apply {
+                      tag = "movie-options"
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(dp(18), dp(10), dp(18), dp(10))
+                      content.addView(this)
+                  })
+                  target.visibility = View.VISIBLE
+                  target.removeAllViews()
+                  if (options.isEmpty()) {
+                      target.addView(text("RSS Core returned no authorized formats.", 13, muted(), false))
+                      return
+                  }
+                  target.addView(text("Choose an authorized format", 13, muted(), false))
+                  options.forEach { option ->
+                      val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(13), 0, dp(13)) }
+                      row.addView(LinearLayout(this@MainActivity).apply {
+                          orientation = LinearLayout.VERTICAL
+                          addView(text(option.kind.uppercase(Locale.US), 13, textColor(), true))
+                          addView(text(listOfNotNull(option.format, option.quality, option.sizeBytes?.let(::formatBytes)).joinToString(" • "), 11, muted(), false))
+                      }, LinearLayout.LayoutParams(0, -2, 1f))
+                      row.addView(primaryButton("Download") { createDownload(requestId, option.id) })
+                      target.addView(row)
+                  }
+              }
+
+'''
+              s = s[:start] + replacement + s[end:]
+
+          old = '''        currentTab = TabOrder.SOCIAL
+        if (urlInput.text.toString() != value) urlInput.setText(value)'''
+          new = '''        val tabChanged = currentTab != TabOrder.SOCIAL
+        currentTab = TabOrder.SOCIAL
+        if (tabChanged) showHome()
+        if (::urlInput.isInitialized && urlInput.text.toString() != value) urlInput.setText(value)'''
+          s = s.replace(old, new)
           p.write_text(s)
-      - name: Commit removal
+      - name: Commit repair
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
-          git diff --cached --quiet || git commit -m 'fix(android): remove slide menu from downloader UI'
+          git diff --cached --quiet || git commit -m 'fix(android): repair movie options and clipboard flow'
           git push
