@@ -1,0 +1,107 @@
+name: Fix Movies Tabs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch Android movie tabs and tab ordering
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
+          s = p.read_text()
+          s = re.sub(r'\n    private val movieTitles = mapOf\(.*?\n    \)\n', '\n', s, count=1, flags=re.S)
+          start = s.index('    private fun buildMovie(box: LinearLayout, tab: String) {')
+          end = s.index('    private fun movieCard(', start)
+          new_build = '''    private fun buildMovie(box: LinearLayout, tab: String) {
+        box.addView(text(tabLabel(tab).uppercase(Locale.US), 10, Color.rgb(140, 156, 255), true).apply { setPadding(dp(18), dp(12), 0, dp(5)) })
+        box.addView(text("Latest movies", 28, textColor(), true).apply { setPadding(dp(18), 0, 0, dp(12)) })
+        val search = EditText(this).apply { hint = "Search movies…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); background = rounded(bg(), 14); setPadding(dp(16), 0, dp(16), 0) }
+        val searchRow = LinearLayout(this).apply { setPadding(dp(18), 0, dp(18), dp(12)) }
+        searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
+        searchRow.addView(primaryButton("Search") { movieSearch(tab, search.text.toString()) }, LinearLayout.LayoutParams(dp(110), dp(52)).apply { setMargins(dp(10), 0, 0, 0) })
+        box.addView(searchRow)
+        val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, dp(12), 0) }
+        box.addView(grid)
+        loadLatestMovies(tab, grid)
+    }
+
+    private fun loadLatestMovies(tab: String, grid: LinearLayout) {
+        grid.removeAllViews()
+        grid.addView(text("Loading latest movies…", 13, muted(), false).apply { setPadding(dp(6), dp(12), dp(6), dp(12)) })
+        if (!api.configured()) { grid.removeAllViews(); grid.addView(text("RSS Core is not configured.", 13, muted(), false)); return }
+        api.search(tab, "") { result -> runOnUiThread {
+            grid.removeAllViews()
+            result.onSuccess { items ->
+                if (items.isEmpty()) { grid.addView(text("No latest movies returned.", 13, muted(), false)); return@onSuccess }
+                items.forEach { item ->
+                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                    row.addView(movieCard(item.title, item.year ?: 2026, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+                    grid.addView(row)
+                }
+            }.onFailure { grid.addView(text(it.message ?: "Failed to load latest movies.", 13, muted(), false)) }
+        }}
+    }
+
+'''
+          s = s[:start] + new_build + s[end:]
+          s = s.replace('        val q = query.trim(); if (q.isBlank()) { toast("Enter a movie name."); return }; if (!api.configured()) {', '        val q = query.trim(); if (!api.configured()) {')
+          marker = '        if (q.isBlank()) { toast("Enter a movie name."); return };'
+          s = s.replace(marker, '        if (q.isBlank()) { showHome(); return };', 1)
+          bstart = s.index('    private fun buildBottomNav(): View = LinearLayout(this).apply {')
+          bend = s.index('    private fun showHome()', bstart)
+          new_bottom = '''    private fun buildBottomNav(): View = LinearLayout(this).apply {
+        gravity = Gravity.CENTER; setPadding(dp(7), dp(6), dp(7), dp(6)); background = rounded(surface(), 22); elevation = dp(12).toFloat()
+        tabOrder.forEach { id ->
+            val selected = id == currentTab
+            val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16); alpha = if (selected) 1f else 0.78f }
+            item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
+            item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
+            item.setOnClickListener {
+                if (currentTab == id) return@setOnClickListener
+                currentTab = id; showHome()
+            }
+            item.setOnLongClickListener { showTabOrderDialog(); true }
+            addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
+        }
+        addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(text("⚙", 19, muted(), false)); addView(text("Settings", 9, muted(), true)); setOnClickListener { showSettings() } }, LinearLayout.LayoutParams(0, dp(58), 1f))
+        layoutParams = LinearLayout.LayoutParams(-1, dp(78)).apply { setMargins(dp(10), 0, dp(10), 0) }
+    }
+
+    private fun showTabOrderDialog() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(8)) }
+        tabOrder.forEachIndexed { index, id ->
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
+            row.addView(text("${index + 1}. ${tabLabel(id)}", 15, textColor(), true), LinearLayout.LayoutParams(0, dp(48), 1f))
+            row.addView(secondaryButton("↑") { if (index > 0) { val x = tabOrder.removeAt(index); tabOrder.add(index - 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
+            row.addView(secondaryButton("↓") { if (index < tabOrder.lastIndex) { val x = tabOrder.removeAt(index); tabOrder.add(index + 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)))
+            box.addView(row)
+        }
+        box.addView(secondaryButton("Reset default order") { prefs.edit().remove("tabOrder").apply(); recreate() }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(10) })
+        android.app.AlertDialog.Builder(this).setTitle("Rearrange tabs").setView(box).setMessage("Long-press any bottom tab to change its position.").setNegativeButton("Close", null).show()
+    }
+
+'''
+          s = s[:bstart] + new_bottom + s[bend:]
+          p.write_text(s)
+          PY
+          git diff --check
+          git config user.name 'RSS Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
+          git commit -m 'fix(ui): latest movie tabs and persistent tab ordering [skip ci]'
+          git push
+      - name: Build after patch
+        run: |
+          chmod +x scripts/build-android.sh
+          ./scripts/build-android.sh
