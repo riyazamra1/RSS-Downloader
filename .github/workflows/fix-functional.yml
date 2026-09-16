@@ -1,28 +1,27 @@
 name: Fix functional flows
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 permissions:
   contents: write
 jobs:
   fix:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Patch native functional flows
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
           s = p.read_text()
-
-          s = s.replace(
-              'private fun renderOptions(requestId: String, options: List<NativeHostApi.MediaOption>) {',
-              'private fun renderOptions(target: LinearLayout, requestId: String, options: List<NativeHostApi.MediaOption>) {'
-          )
+          s = s.replace('private fun renderOptions(requestId: String, options: List<NativeHostApi.MediaOption>) {', 'private fun renderOptions(target: LinearLayout, requestId: String, options: List<NativeHostApi.MediaOption>) {')
           s = s.replace('mediaPanel.visibility = View.VISIBLE\n        mediaPanel.removeAllViews()', 'target.visibility = View.VISIBLE\n        target.removeAllViews()')
           s = s.replace('mediaPanel.addView(text("RSS Core returned no authorized formats.", 13, muted(), false))', 'target.addView(text("RSS Core returned no authorized formats.", 13, muted(), false))')
           s = s.replace('mediaPanel.addView(text("Choose an authorized format", 13, muted(), false))', 'target.addView(text("Choose an authorized format", 13, muted(), false))')
@@ -35,8 +34,7 @@ jobs:
                 panel.addView(optionsPanel)
                 if (results.isEmpty()) panel.addView(text("No results returned by RSS Core.", 13, muted(), false).apply { setPadding(0, dp(12), 0, dp(8)) })
                 results.forEach { item ->'''
-          if old not in s:
-              raise SystemExit('movie results anchor not found')
+          if old not in s: raise SystemExit('movie results anchor not found')
           s = s.replace(old, new)
 
           old = '''                    row.addView(primaryButton("Select") {
@@ -59,8 +57,7 @@ jobs:
                             optionsPanel.addView(text("RSS Core did not return a request ID for this result.", 13, muted(), false))
                         }
                     })'''
-          if old not in s:
-              raise SystemExit('movie select anchor not found')
+          if old not in s: raise SystemExit('movie select anchor not found')
           s = s.replace(old, new)
 
           old = '''    private fun readClipboardUrl(autoAnalyze: Boolean) {
@@ -86,22 +83,19 @@ jobs:
         if (!value.startsWith("http://") && !value.startsWith("https://")) return
         val tabChanged = currentTab != TabOrder.SOCIAL
         currentTab = TabOrder.SOCIAL
-        if (tabChanged) {
-            showHome()
-        }
+        if (tabChanged) showHome()
         if (::urlInput.isInitialized && urlInput.text.toString() != value) urlInput.setText(value)
         if (autoAnalyze && prefs.getString("lastClipboardUrl", "") != value) {
             prefs.edit().putString("lastClipboardUrl", value).apply()
             urlInput.postDelayed({ if (!isFinishing && currentTab == TabOrder.SOCIAL) analyzeUrl() }, 180)
         }
     }'''
-          if old not in s:
-              raise SystemExit('clipboard anchor not found')
+          if old not in s: raise SystemExit('clipboard anchor not found')
           s = s.replace(old, new)
-
           p.write_text(s)
           PY
       - name: Commit functional patch
+        shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
