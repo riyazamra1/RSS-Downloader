@@ -100,6 +100,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(dp(3), dp(8), dp(3), dp(7))
                 background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)
                 alpha = if (selected) 1f else 0.78f
+                alpha = if (selected) 1f else 0.78f
             }
             item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
             item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
