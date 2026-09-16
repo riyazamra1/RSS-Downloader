@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-apk:
@@ -16,108 +16,121 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Apply functional movie and tab-order fixes
+      - name: Apply release UI and runtime fixes
+        shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import re
+
           p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
           s = p.read_text()
-          s = re.sub(r'\n    private val movieTitles = mapOf\(.*?\n    \)\n', '\n', s, count=1, flags=re.S)
-          if 'private fun loadLatestMovies' not in s:
-              start = s.index('    private fun buildMovie(box: LinearLayout, tab: String) {')
-              end = s.index('    private fun movieCard(', start)
-              new_build = '''    private fun buildMovie(box: LinearLayout, tab: String) {
-              box.addView(text(tabLabel(tab).uppercase(Locale.US), 10, Color.rgb(140, 156, 255), true).apply { setPadding(dp(18), dp(12), 0, dp(5)) })
-              box.addView(text("Latest movies", 28, textColor(), true).apply { setPadding(dp(18), 0, 0, dp(12)) })
-              val search = EditText(this).apply { hint = "Search movies…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); background = rounded(bg(), 14); setPadding(dp(16), 0, dp(16), 0) }
-              val searchRow = LinearLayout(this).apply { setPadding(dp(18), 0, dp(18), dp(12)) }
-              searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
-              searchRow.addView(primaryButton("Search") { movieSearch(tab, search.text.toString()) }, LinearLayout.LayoutParams(dp(110), dp(52)).apply { setMargins(dp(10), 0, 0, 0) })
-              box.addView(searchRow)
-              val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, dp(12), 0) }
-              box.addView(grid)
-              loadLatestMovies(tab, grid)
-          }
 
-          private fun loadLatestMovies(tab: String, grid: LinearLayout) {
-              grid.removeAllViews()
-              grid.addView(text("Loading latest movies…", 13, muted(), false).apply { setPadding(dp(6), dp(12), dp(6), dp(12)) })
-              if (!api.configured()) { grid.removeAllViews(); grid.addView(text("RSS Core is not configured.", 13, muted(), false)); return }
-              api.search(tab, "") { result -> runOnUiThread {
-                  grid.removeAllViews()
-                  result.onSuccess { items ->
-                      if (items.isEmpty()) { grid.addView(text("No latest movies returned.", 13, muted(), false)); return@onSuccess }
-                      items.forEach { item ->
-                          val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-                          row.addView(movieCard(item.title, item.year ?: 2026, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
-                          grid.addView(row)
-                      }
-                  }.onFailure { grid.addView(text(it.message ?: "Failed to load latest movies.", 13, muted(), false)) }
-              }}
-          }
+          if 'import androidx.appcompat.app.AppCompatDelegate' not in s:
+              s = s.replace('import androidx.appcompat.app.AppCompatActivity', 'import androidx.appcompat.app.AppCompatActivity\nimport androidx.appcompat.app.AppCompatDelegate')
 
-          '''
-              s = s[:start] + new_build + s[end:]
-          s = s.replace('val q = query.trim(); if (q.isBlank()) { toast("Enter a movie name."); return }; if (!api.configured()) {', 'val q = query.trim(); if (!api.configured()) {')
-          if 'if (q.isBlank()) { showHome(); return };' not in s:
-              s = s.replace('val q = query.trim(); if (!api.configured()) {', 'val q = query.trim(); if (!api.configured()) { if (q.isBlank()) { showHome(); return };', 1)
-          if 'private fun showTabOrderDialog()' not in s:
-              bstart = s.index('    private fun buildBottomNav(): View = LinearLayout(this).apply {')
-              bend = s.index('    private fun showHome()', bstart)
-              new_bottom = '''    private fun buildBottomNav(): View = LinearLayout(this).apply {
-              gravity = Gravity.CENTER; setPadding(dp(7), dp(6), dp(7), dp(6)); background = rounded(surface(), 22); elevation = dp(12).toFloat()
-              tabOrder.forEach { id ->
-                  val selected = id == currentTab
-                  val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16); alpha = if (selected) 1f else 0.78f }
-                  item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
-                  item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
-                  item.setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
-                  item.setOnLongClickListener { showTabOrderDialog(); true }
-                  addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
-              }
-              addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(text("⚙", 19, muted(), false)); addView(text("Settings", 9, muted(), true)); setOnClickListener { showSettings() } }, LinearLayout.LayoutParams(0, dp(58), 1f))
-              layoutParams = LinearLayout.LayoutParams(-1, dp(78)).apply { setMargins(dp(10), 0, dp(10), 0) }
-          }
+          s = s.replace('    override fun onCreate(savedInstanceState: Bundle?) {\n        super.onCreate(savedInstanceState)', '''    override fun onCreate(savedInstanceState: Bundle?) {
+        val savedLight = getSharedPreferences("rss-downloader", MODE_PRIVATE).getBoolean("light", false)
+        AppCompatDelegate.setDefaultNightMode(if (savedLight) AppCompatDelegate.MODE_NIGHT_NO else AppCompatDelegate.MODE_NIGHT_YES)
+        super.onCreate(savedInstanceState)''')
 
-          private fun showTabOrderDialog() {
-              val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(8)) }
-              tabOrder.forEachIndexed { index, id ->
-                  val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
-                  row.addView(text("${index + 1}. ${tabLabel(id)}", 15, textColor(), true), LinearLayout.LayoutParams(0, dp(48), 1f))
-                  row.addView(secondaryButton("↑") { if (index > 0) { val x = tabOrder.removeAt(index); tabOrder.add(index - 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
-                  row.addView(secondaryButton("↓") { if (index < tabOrder.lastIndex) { val x = tabOrder.removeAt(index); tabOrder.add(index + 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)))
-                  box.addView(row)
-              }
-              box.addView(secondaryButton("Reset default order") { prefs.edit().remove("tabOrder").apply(); recreate() }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(10) })
-              android.app.AlertDialog.Builder(this).setTitle("Rearrange tabs").setView(box).setNegativeButton("Close", null).show()
-          }
+          s = s.replace('        addView(button("⚙", 46) { showSettings() })', '        addView(iconButton(R.drawable.ic_rss_settings, 46) { showSettings() })')
 
-          '''
-              s = s[:bstart] + new_bottom + s[bend:]
+          bstart = s.index('    private fun buildBottomNav(): View = LinearLayout(this).apply {')
+          bend = s.index('    private fun showTabOrderDialog()', bstart)
+          new_bottom = '''    private fun buildBottomNav(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        setPadding(dp(8), dp(7), dp(8), dp(7))
+        setBackgroundColor(surface())
+        elevation = dp(10).toFloat()
+        tabOrder.forEach { id ->
+            val selected = id == currentTab
+            addView(navItem(id, selected) { if (currentTab != id) { currentTab = id; showHome() } }, LinearLayout.LayoutParams(0, dp(62), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
+        }
+        addView(navSettingsItem(), LinearLayout.LayoutParams(0, dp(62), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
+        layoutParams = LinearLayout.LayoutParams(-1, dp(76))
+    }
+
+    private fun navItem(id: String, selected: Boolean, onClick: () -> Unit): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(dp(4), dp(5), dp(4), dp(4))
+        background = rounded(if (selected) accent() else Color.TRANSPARENT, 16)
+        alpha = if (selected) 1f else 0.82f
+        val icon = ImageView(this@MainActivity).apply {
+            setImageResource(when (id) { TabOrder.SOCIAL -> R.drawable.ic_rss_download; TabOrder.TAMIL -> R.drawable.ic_rss_movie; else -> R.drawable.ic_rss_dubbed })
+            imageTintList = android.content.res.ColorStateList.valueOf(if (selected) Color.WHITE else muted())
+            contentDescription = tabLabel(id)
+        }
+        addView(icon, LinearLayout.LayoutParams(dp(25), dp(25)))
+        addView(text(tabShortLabel(id), 10, if (selected) Color.WHITE else muted(), true))
+        setOnClickListener { onClick() }
+        setOnLongClickListener { showTabOrderDialog(); true }
+    }
+
+    private fun navSettingsItem(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(dp(4), dp(5), dp(4), dp(4))
+        background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+        alpha = 0.82f
+        val icon = ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_rss_settings)
+            imageTintList = android.content.res.ColorStateList.valueOf(muted())
+            contentDescription = "Settings"
+        }
+        addView(icon, LinearLayout.LayoutParams(dp(25), dp(25)))
+        addView(text("Settings", 10, muted(), true))
+        setOnClickListener { showSettings() }
+    }
+
+'''
+          s = s[:bstart] + new_bottom + s[bend:]
+
+          # Remove explanatory feature-copy from the social hero; the behavior is implemented, not advertised as static text.
+          s = re.sub(r'\n        hero\.addView\(text\("Paste a link\\nRSS handles the rest\..*?\)\)', '', s, count=1, flags=re.S)
+          s = re.sub(r'\n        hero\.addView\(text\("Copied HTTP\(S\) links are detected automatically while RSS Downloader is active\.".*?\)\)', '', s, count=1, flags=re.S)
+
+          # Accept text clips even when Android reports a different text MIME type.
+          old = '''        if (cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) != true) return
+        val value = clip.getItemAt(0).coerceToText(this).toString().trim()'''
+          new = '''        val item = clip.getItemAt(0)
+        val value = (item.text?.toString() ?: item.coerceToText(this).toString()).trim()'''
+          s = s.replace(old, new)
+
+          marker = '    private fun button(label: String, size: Int, onClick: () -> Unit)'
+          if 'private fun iconButton(' not in s:
+              helper = '''    private fun iconButton(iconRes: Int, size: Int, onClick: () -> Unit) = ImageButton(this).apply {
+        setImageResource(iconRes)
+        imageTintList = android.content.res.ColorStateList.valueOf(textColor())
+        background = rounded(surface2(), 14)
+        contentDescription = "Settings"
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)).apply { setMargins(0, 0, dp(8), 0) }
+    }
+
+'''
+              s = s.replace(marker, helper + marker)
+
           p.write_text(s)
+
+          res = Path('android/app/src/main/res')
+          (res / 'values-night').mkdir(parents=True, exist_ok=True)
+          (res / 'values-night/colors.xml').write_text('''<resources>\n    <color name="splash_background">#070B16</color>\n</resources>\n''')
+          (res / 'values-night/styles.xml').write_text('''<resources>\n    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">\n        <item name="android:windowActionModeOverlay">true</item>\n        <item name="android:windowBackground">@color/splash_background</item>\n    </style>\n</resources>\n''')
+          (res / 'values-v31/styles.xml').write_text('''<resources>\n    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">\n        <item name="android:windowActionModeOverlay">true</item>\n        <item name="android:windowSplashScreenBackground">@color/splash_background</item>\n        <item name="android:windowSplashScreenAnimatedIcon">@drawable/rss_downloader_splash_icon</item>\n    </style>\n</resources>\n''')
           PY
+
           git diff --check
-          git config user.name 'RSS Automation'
-          git config user.email 'actions@users.noreply.github.com'
-          if ! git diff --quiet; then
-            git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
-            git commit -m 'fix(ui): live movie feed and tab ordering [skip ci]'
-            git push
-          fi
 
       - name: Verify build environment
         run: |
           set -euo pipefail
-          command -v git
-          command -v node
-          command -v npm
-          command -v java
-          command -v curl
-          command -v unzip
           java -version
           node --version
           npm --version
@@ -126,17 +139,12 @@ jobs:
         run: |
           set -euo pipefail
           SDKMANAGER=""
-          for candidate in \
-            "${ANDROID_HOME:-}/cmdline-tools/latest/bin/sdkmanager" \
-            "${ANDROID_SDK_ROOT:-}/cmdline-tools/latest/bin/sdkmanager" \
-            "$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager"; do
+          for candidate in "${ANDROID_HOME:-}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT:-}/cmdline-tools/latest/bin/sdkmanager" "$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager"; do
             if [[ -x "$candidate" ]]; then SDKMANAGER="$candidate"; break; fi
           done
           if [[ -n "$SDKMANAGER" ]]; then
             yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
             "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-          else
-            echo "sdkmanager not found; relying on the preinstalled Android SDK."
           fi
 
       - name: Prepare native Android logo asset
@@ -152,9 +160,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           path = Path("android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt")
-          text = path.read_text()
-          text = text.replace("hintTextColor = muted()", "setHintTextColor(muted())")
-          text = text.replace("background = ColorDrawableCompat.transparent()", "background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)")
+          text = path.read_text().replace("hintTextColor = muted()", "setHintTextColor(muted())").replace("background = ColorDrawableCompat.transparent()", "background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)")
           path.write_text(text)
           PY
 
