@@ -1,4 +1,4 @@
-import type { DownloaderTab, SearchResponse } from "../../core/contracts/api";
+import type { DownloadJob, DownloaderTab, SearchResponse } from "../../core/contracts/api";
 import type { RayAdapter } from "../worker";
 
 /**
@@ -17,7 +17,7 @@ export class CatalogRayAdapter implements RayAdapter {
 
   constructor(private readonly callbacks: CatalogProviderCallbacks) {}
 
-  async analyze(): Promise<never> {
+  async analyze(_input: Record<string, unknown>): Promise<never> {
     throw new Error("Catalog adapter does not analyze arbitrary URLs.");
   }
 
@@ -28,7 +28,11 @@ export class CatalogRayAdapter implements RayAdapter {
     return { tab, query, results: await this.callbacks.search(tab, query) };
   }
 
-  async download(): Promise<never> {
+  async download(
+    _input: Record<string, unknown>,
+    _job: DownloadJob,
+    _onProgress?: (job: DownloadJob) => void,
+  ): Promise<never> {
     throw new Error("Catalog search results must provide an authorized download adapter.");
   }
 }
