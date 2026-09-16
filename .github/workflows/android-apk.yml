@@ -18,124 +18,20 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Apply release UI and runtime fixes
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
-          s = p.read_text()
-
-          if 'import androidx.appcompat.app.AppCompatDelegate' not in s:
-              s = s.replace('import androidx.appcompat.app.AppCompatActivity', 'import androidx.appcompat.app.AppCompatActivity\nimport androidx.appcompat.app.AppCompatDelegate')
-
-          s = s.replace('    override fun onCreate(savedInstanceState: Bundle?) {\n        super.onCreate(savedInstanceState)', '''    override fun onCreate(savedInstanceState: Bundle?) {
-        val savedLight = getSharedPreferences("rss-downloader", MODE_PRIVATE).getBoolean("light", false)
-        AppCompatDelegate.setDefaultNightMode(if (savedLight) AppCompatDelegate.MODE_NIGHT_NO else AppCompatDelegate.MODE_NIGHT_YES)
-        super.onCreate(savedInstanceState)''')
-
-          s = s.replace('        addView(button("⚙", 46) { showSettings() })', '        addView(iconButton(R.drawable.ic_rss_settings, 46) { showSettings() })')
-
-          bstart = s.index('    private fun buildBottomNav(): View = LinearLayout(this).apply {')
-          bend = s.index('    private fun showTabOrderDialog()', bstart)
-          new_bottom = '''    private fun buildBottomNav(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER
-        setPadding(dp(8), dp(7), dp(8), dp(7))
-        setBackgroundColor(surface())
-        elevation = dp(10).toFloat()
-        tabOrder.forEach { id ->
-            val selected = id == currentTab
-            addView(navItem(id, selected) { if (currentTab != id) { currentTab = id; showHome() } }, LinearLayout.LayoutParams(0, dp(62), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
-        }
-        addView(navSettingsItem(), LinearLayout.LayoutParams(0, dp(62), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
-        layoutParams = LinearLayout.LayoutParams(-1, dp(76))
-    }
-
-    private fun navItem(id: String, selected: Boolean, onClick: () -> Unit): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        setPadding(dp(4), dp(5), dp(4), dp(4))
-        background = rounded(if (selected) accent() else Color.TRANSPARENT, 16)
-        alpha = if (selected) 1f else 0.82f
-        val icon = ImageView(this@MainActivity).apply {
-            setImageResource(when (id) { TabOrder.SOCIAL -> R.drawable.ic_rss_download; TabOrder.TAMIL -> R.drawable.ic_rss_movie; else -> R.drawable.ic_rss_dubbed })
-            imageTintList = android.content.res.ColorStateList.valueOf(if (selected) Color.WHITE else muted())
-            contentDescription = tabLabel(id)
-        }
-        addView(icon, LinearLayout.LayoutParams(dp(25), dp(25)))
-        addView(text(tabShortLabel(id), 10, if (selected) Color.WHITE else muted(), true))
-        setOnClickListener { onClick() }
-        setOnLongClickListener { showTabOrderDialog(); true }
-    }
-
-    private fun navSettingsItem(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        setPadding(dp(4), dp(5), dp(4), dp(4))
-        background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
-        alpha = 0.82f
-        val icon = ImageView(this@MainActivity).apply {
-            setImageResource(R.drawable.ic_rss_settings)
-            imageTintList = android.content.res.ColorStateList.valueOf(muted())
-            contentDescription = "Settings"
-        }
-        addView(icon, LinearLayout.LayoutParams(dp(25), dp(25)))
-        addView(text("Settings", 10, muted(), true))
-        setOnClickListener { showSettings() }
-    }
-
-'''
-          s = s[:bstart] + new_bottom + s[bend:]
-
-          # Remove explanatory feature-copy from the social hero; the behavior is implemented, not advertised as static text.
-          s = re.sub(r'\n        hero\.addView\(text\("Paste a link\\nRSS handles the rest\..*?\)\)', '', s, count=1, flags=re.S)
-          s = re.sub(r'\n        hero\.addView\(text\("Copied HTTP\(S\) links are detected automatically while RSS Downloader is active\.".*?\)\)', '', s, count=1, flags=re.S)
-
-          # Accept text clips even when Android reports a different text MIME type.
-          old = '''        if (cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) != true) return
-        val value = clip.getItemAt(0).coerceToText(this).toString().trim()'''
-          new = '''        val item = clip.getItemAt(0)
-        val value = (item.text?.toString() ?: item.coerceToText(this).toString()).trim()'''
-          s = s.replace(old, new)
-
-          marker = '    private fun button(label: String, size: Int, onClick: () -> Unit)'
-          if 'private fun iconButton(' not in s:
-              helper = '''    private fun iconButton(iconRes: Int, size: Int, onClick: () -> Unit) = ImageButton(this).apply {
-        setImageResource(iconRes)
-        imageTintList = android.content.res.ColorStateList.valueOf(textColor())
-        background = rounded(surface2(), 14)
-        contentDescription = "Settings"
-        setPadding(dp(10), dp(10), dp(10), dp(10))
-        setOnClickListener { onClick() }
-        layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)).apply { setMargins(0, 0, dp(8), 0) }
-    }
-
-'''
-              s = s.replace(marker, helper + marker)
-
-          p.write_text(s)
-
-          res = Path('android/app/src/main/res')
-          (res / 'values-night').mkdir(parents=True, exist_ok=True)
-          (res / 'values-night/colors.xml').write_text('''<resources>\n    <color name="splash_background">#070B16</color>\n</resources>\n''')
-          (res / 'values-night/styles.xml').write_text('''<resources>\n    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">\n        <item name="android:windowActionModeOverlay">true</item>\n        <item name="android:windowBackground">@color/splash_background</item>\n    </style>\n</resources>\n''')
-          (res / 'values-v31/styles.xml').write_text('''<resources>\n    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">\n        <item name="android:windowActionModeOverlay">true</item>\n        <item name="android:windowSplashScreenBackground">@color/splash_background</item>\n        <item name="android:windowSplashScreenAnimatedIcon">@drawable/rss_downloader_splash_icon</item>\n    </style>\n</resources>\n''')
-          PY
-
-          git diff --check
+      - name: Prepare release source
+        run: python3 scripts/prepare-android-build.py
 
       - name: Verify build environment
         run: |
           set -euo pipefail
+          command -v java
+          command -v node
+          command -v npm
           java -version
           node --version
           npm --version
 
-      - name: Install Android SDK components when sdkmanager is available
+      - name: Install Android SDK components
         run: |
           set -euo pipefail
           SDKMANAGER=""
@@ -145,6 +41,8 @@ jobs:
           if [[ -n "$SDKMANAGER" ]]; then
             yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
             "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          else
+            echo "sdkmanager not found; using preinstalled SDK"
           fi
 
       - name: Prepare native Android logo asset
@@ -160,7 +58,9 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           path = Path("android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt")
-          text = path.read_text().replace("hintTextColor = muted()", "setHintTextColor(muted())").replace("background = ColorDrawableCompat.transparent()", "background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)")
+          text = path.read_text()
+          text = text.replace("hintTextColor = muted()", "setHintTextColor(muted())")
+          text = text.replace("background = ColorDrawableCompat.transparent()", "background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)")
           path.write_text(text)
           PY
 
