@@ -33,7 +33,9 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun search(tab: String, query: String, callback: (Result<List<SearchResult>>) -> Unit) = executor.execute {
         callback(runCatching {
-            val json = requestObject("/api/downloader/search", "POST", JSONObject().put("tab", tab).put("query", query))
+            // RSS Core requires a non-empty query. The movie tabs use this as their latest-feed request.
+            val effectiveQuery = if (query.isBlank() && tab != TabOrder.SOCIAL) "latest Tamil movies 2026" else query
+            val json = requestObject("/api/downloader/search", "POST", JSONObject().put("tab", tab).put("query", effectiveQuery))
             val results = mutableListOf<SearchResult>()
             val array = json.optJSONArray("results") ?: JSONArray()
             for (i in 0 until array.length()) {
@@ -123,22 +125,40 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     private fun requestText(path: String, method: String, body: JSONObject?): String {
         if (!configured()) throw IllegalStateException("RSS host API is not configured.")
-        val connection = (URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection)
-        connection.requestMethod = method
-        connection.connectTimeout = 15000
-        connection.readTimeout = 30000
-        connection.setRequestProperty("Accept", "application/json")
-        if (body != null) {
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+        val primary = baseUrl.trimEnd('/') + path
+        val primaryResult = execute(primary, method, body)
+        if (primaryResult.first != 404) return primaryResult.second
+
+        // Compatibility with an older/newer RSS Core gateway that exposes the downloader under /api/v1.
+        val fallbackPath = if (path.startsWith("/api/") && !path.startsWith("/api/v1/")) path.replaceFirst("/api/", "/api/v1/") else null
+        if (fallbackPath != null) {
+            val fallbackResult = execute(baseUrl.trimEnd('/') + fallbackPath, method, body)
+            if (fallbackResult.first in 200..299) return fallbackResult.second
         }
-        if (!accessToken.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $accessToken")
-        val code = connection.responseCode
-        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-        val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        connection.disconnect()
-        if (code !in 200..299) throw IllegalStateException("RSS host API request failed ($code). ${text.take(180)}")
-        return text
+        val detail = primaryResult.second.take(240)
+        throw IllegalStateException("RSS host API request failed (${primaryResult.first}). ${detail.ifBlank { "Endpoint not found." }}")
+    }
+
+    private fun execute(url: String, method: String, body: JSONObject?): Pair<Int, String> {
+        val connection = (URL(url).openConnection() as HttpURLConnection)
+        return try {
+            connection.requestMethod = method
+            connection.connectTimeout = 15000
+            connection.readTimeout = 30000
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty("Accept", "application/json")
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            }
+            if (!accessToken.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $accessToken")
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            code to text
+        } finally {
+            connection.disconnect()
+        }
     }
 }
