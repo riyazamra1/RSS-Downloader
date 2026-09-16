@@ -21,8 +21,30 @@ jobs:
           from pathlib import Path
           p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
           s = p.read_text()
-          s = s.replace('        startDownloadKeepAlive()\n        requestNotificationPermissionIfNeeded()\n', '        requestNotificationPermissionIfNeeded()\n')
-          s = s.replace('            result.onSuccess { showDownloads() }.onFailure { toast(it.message ?: "Download failed.") }', '            result.onSuccess {\n                requestNotificationPermissionIfNeeded()\n                startDownloadKeepAlive()\n                showDownloads()\n            }.onFailure { toast(it.message ?: "Download failed.") }')
+          s = s.replace('        startDownloadKeepAlive()\n        requestNotificationPermissionIfNeeded()\n', '')
+          s = s.replace('        startDownloadKeepAlive()\n        requestNotificationPermissionIfNeeded()\n', '')
+          old = '            result.onSuccess { showDownloads() }.onFailure { toast(it.message ?: "Download failed.") }'
+          new = '''            result.onSuccess {
+                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4102)
+                } else {
+                    startDownloadKeepAlive()
+                }
+                showDownloads()
+            }.onFailure { toast(it.message ?: "Download failed.") }'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          marker = '    private fun startDownloadKeepAlive() {'
+          if 'override fun onRequestPermissionsResult' not in s:
+              insert = '''    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 4102 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            startDownloadKeepAlive()
+        }
+    }
+
+'''
+              s = s.replace(marker, insert + marker, 1)
           p.write_text(s)
           PY
       - name: Commit patch
@@ -31,5 +53,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
           git diff --cached --quiet && exit 0
-          git commit -m 'fix(android): start foreground service only for downloads'
+          git commit -m 'fix(android): start foreground service only during downloads'
           git push
