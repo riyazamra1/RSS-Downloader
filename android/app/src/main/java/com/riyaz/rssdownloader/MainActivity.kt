@@ -79,10 +79,18 @@ class MainActivity : AppCompatActivity() {
         gravity = Gravity.CENTER; setPadding(dp(7), dp(6), dp(7), dp(6)); background = rounded(surface(), 22); elevation = dp(12).toFloat()
         tabOrder.forEach { id ->
             val selected = id == currentTab
-            val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16); alpha = if (selected) 1f else 0.78f }
+            val item = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(8), dp(3), dp(7)); background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)
+                alpha = if (selected) 1f else 0.78f; alpha = if (selected) 1f else 0.78f }
             item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
             item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
-            item.setOnClickListener { currentTab = id; showHome() }
+            item.setOnClickListener {
+                if (currentTab == id) return@setOnClickListener
+                currentTab = id
+                item.animate().scaleX(0.94f).scaleY(0.94f).setDuration(70).withEndAction {
+                    item.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+                }.start()
+                showHome()
+            }
             addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
         }
         addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(text("⚙", 19, muted(), false)); addView(text("Settings", 9, muted(), true)); setOnClickListener { showSettings() } }, LinearLayout.LayoutParams(0, dp(58), 1f))
