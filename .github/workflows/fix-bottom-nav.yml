@@ -1,0 +1,32 @@
+name: Fix bottom navigation
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch native navigation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
+          s = p.read_text()
+          s = s.replace('setPadding(0, 0, 0, dp(88))', 'setPadding(0, 0, 0, 0)')
+          s = s.replace('layoutParams = FrameLayout.LayoutParams(-1, dp(78), Gravity.BOTTOM).apply { setMargins(dp(10), 0, dp(10), dp(8)) }', 'layoutParams = LinearLayout.LayoutParams(-1, dp(78)).apply { setMargins(dp(10), 0, dp(10), 0) }')
+          s = s.replace('background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)', 'background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)\n                alpha = if (selected) 1f else 0.78f')
+          s = s.replace('item.setOnClickListener { currentTab = id; showHome() }', 'item.setOnClickListener {\n                if (currentTab == id) return@setOnClickListener\n                currentTab = id\n                item.animate().scaleX(0.94f).scaleY(0.94f).setDuration(70).withEndAction {\n                    item.animate().scaleX(1f).scaleY(1f).setDuration(160).start()\n                }.start()\n                showHome()\n            }')
+          s = s.replace('setOnClickListener { showSettings() }\n        }, LinearLayout.LayoutParams(0, dp(58), 1f))', 'setOnClickListener {\n                animate().scaleX(0.94f).scaleY(0.94f).setDuration(70).withEndAction {\n                    animate().scaleX(1f).scaleY(1f).setDuration(160).start()\n                }.start()\n                showSettings()\n            }\n        }, LinearLayout.LayoutParams(0, dp(58), 1f))')
+          p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
+          git diff --cached --quiet || git commit -m 'fix(android): anchor bottom navigation to screen bottom and add motion'
+          git push
