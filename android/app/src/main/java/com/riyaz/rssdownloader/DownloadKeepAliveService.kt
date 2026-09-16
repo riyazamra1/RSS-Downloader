@@ -26,6 +26,7 @@ class DownloadKeepAliveService : Service() {
     }
 
     private val executor = Executors.newSingleThreadExecutor()
+    @Volatile private var stopping = false
     private val api by lazy {
         val prefs = getSharedPreferences("rss-downloader", MODE_PRIVATE)
         NativeHostApi(
@@ -41,21 +42,26 @@ class DownloadKeepAliveService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            stopping = true
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
+        stopping = false
         startForeground(NOTIFICATION_ID, buildNotification("Starting download…", 0))
         pollDownloads()
         return START_NOT_STICKY
     }
 
     private fun pollDownloads() {
+        if (stopping) return
         executor.execute {
             api.listDownloads { result ->
+                if (stopping) return@listDownloads
                 result.onSuccess { jobs ->
                     val active = jobs.filter { it.status.uppercase(Locale.US) in ACTIVE_STATUSES }
                     if (active.isEmpty()) {
+                        stopping = true
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     } else {
@@ -70,16 +76,17 @@ class DownloadKeepAliveService : Service() {
                         schedulePoll()
                     }
                 }.onFailure {
-                    schedulePoll()
+                    if (!stopping) schedulePoll()
                 }
             }
         }
     }
 
     private fun schedulePoll() {
+        if (stopping) return
         executor.execute {
             try { Thread.sleep(5000) } catch (_: InterruptedException) { return@execute }
-            if (!isStopped) pollDownloads()
+            if (!stopping) pollDownloads()
         }
     }
 
@@ -104,6 +111,7 @@ class DownloadKeepAliveService : Service() {
     }
 
     override fun onDestroy() {
+        stopping = true
         executor.shutdownNow()
         super.onDestroy()
     }
