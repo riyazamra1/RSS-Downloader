@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
 
+# Public-repository CI probe: keep the workflow on the standard GitHub-hosted runner.
 jobs:
   build-apk:
     runs-on: ubuntu-latest
