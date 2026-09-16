@@ -7,11 +7,12 @@ import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.Executors
 
-/** Native Android replacement for the browser-side RssHostApi. */
+/** Native Android implementation of the RSS Downloader host contract. */
 class NativeHostApi(private val baseUrl: String, private val accessToken: String? = null) {
     data class MediaOption(val id: String, val kind: String, val format: String, val quality: String?, val sizeBytes: Long?)
     data class SearchResult(val id: String, val requestId: String?, val title: String, val year: Int?, val thumbnailUrl: String?, val qualities: List<String>, val mediaOptions: List<MediaOption>)
     data class Job(val jobId: String, val status: String, val progress: Int?, val title: String?, val thumbnailUrl: String?, val mediaKind: String?, val quality: String?, val format: String?, val downloadedBytes: Long?, val totalBytes: Long?, val speed: Long?, val eta: Long?, val error: String?)
+    data class Analysis(val requestId: String, val title: String, val normalizedUrl: String, val thumbnailUrl: String?, val mediaOptions: List<MediaOption>)
 
     private val executor = Executors.newCachedThreadPool()
 
@@ -20,9 +21,12 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     fun analyze(url: String, callback: (Result<Analysis>) -> Unit) = executor.execute {
         callback(runCatching {
             val json = request("/api/downloader/analyze", "POST", JSONObject().put("url", url))
+            val requestId = json.optString("requestId")
             Analysis(
-                json.optString("requestId"), json.optString("title", "RSS Download"),
-                json.optString("normalizedUrl", url), json.optString("thumbnailUrl", "").ifBlank { null },
+                requestId,
+                json.optString("title", "RSS Download"),
+                json.optString("normalizedUrl", url),
+                json.optString("thumbnailUrl", "").ifBlank { null },
                 mediaOptions(json.optJSONArray("mediaOptions")),
             )
         })
@@ -36,9 +40,12 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
             for (i in 0 until array.length()) {
                 val item = array.getJSONObject(i)
                 results += SearchResult(
-                    item.optString("id"), item.optString("requestId").ifBlank { null }, item.optString("title", "Untitled"),
+                    item.optString("id"),
+                    item.optString("requestId").ifBlank { null },
+                    item.optString("title", "Untitled"),
                     if (item.has("year") && !item.isNull("year")) item.optInt("year") else null,
-                    item.optString("thumbnailUrl", "").ifBlank { null }, jsonStringList(item.optJSONArray("qualities")),
+                    item.optString("thumbnailUrl", "").ifBlank { null },
+                    jsonStringList(item.optJSONArray("qualities")),
                     mediaOptions(item.optJSONArray("mediaOptions")),
                 )
             }
@@ -46,10 +53,22 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         })
     }
 
+    fun listMediaOptions(requestId: String, callback: (Result<List<MediaOption>>) -> Unit) = executor.execute {
+        callback(runCatching {
+            val json = request("/api/downloader/media-options/${enc(requestId)}", "GET", null)
+            if (json.has("mediaOptions")) mediaOptions(json.optJSONArray("mediaOptions"))
+            else if (json.has("options")) mediaOptions(json.optJSONArray("options"))
+            else if (json.has("results")) mediaOptions(json.optJSONArray("results"))
+            else mediaOptions(json.optJSONArray(null))
+        })
+    }
+
     fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute {
         callback(runCatching {
             parseJob(request("/api/downloader/download", "POST", JSONObject()
-                .put("requestId", requestId).put("mediaOptionId", optionId).put("authorizationApproved", true)))
+                .put("requestId", requestId)
+                .put("mediaOptionId", optionId)
+                .put("authorizationApproved", true)))
         })
     }
 
@@ -65,23 +84,37 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         callback(runCatching { parseJob(request("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) })
     }
 
-    data class Analysis(val requestId: String, val title: String, val normalizedUrl: String, val thumbnailUrl: String?, val mediaOptions: List<MediaOption>)
-
     private fun mediaOptions(array: JSONArray?): List<MediaOption> {
         if (array == null) return emptyList()
         return buildList {
             for (i in 0 until array.length()) {
-                val o = array.getJSONObject(i)
-                add(MediaOption(o.optString("id"), o.optString("kind", "media"), o.optString("format", ""), o.optString("quality", "").ifBlank { null }, if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null))
+                val o = array.optJSONObject(i) ?: continue
+                val id = o.optString("id").ifBlank { o.optString("mediaOptionId") }
+                if (id.isBlank()) continue
+                add(MediaOption(
+                    id,
+                    o.optString("kind", "media"),
+                    o.optString("format", ""),
+                    o.optString("quality", "").ifBlank { null },
+                    if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null,
+                ))
             }
         }
     }
 
     private fun parseJob(o: JSONObject): Job = Job(
-        o.optString("jobId"), o.optString("status", "unknown"), if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null,
-        o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { null }, o.optString("mediaKind", "").ifBlank { null },
-        o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null },
-        longOrNull(o, "downloadedBytes"), longOrNull(o, "totalBytes"), longOrNull(o, "speedBytesPerSecond"), longOrNull(o, "etaSeconds"),
+        o.optString("jobId"),
+        o.optString("status", "unknown"),
+        if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null,
+        o.optString("title", "").ifBlank { null },
+        o.optString("thumbnailUrl", "").ifBlank { null },
+        o.optString("mediaKind", "").ifBlank { null },
+        o.optString("quality", "").ifBlank { null },
+        o.optString("format", "").ifBlank { null },
+        longOrNull(o, "downloadedBytes"),
+        longOrNull(o, "totalBytes"),
+        longOrNull(o, "speedBytesPerSecond"),
+        longOrNull(o, "etaSeconds"),
         o.optString("error", "").ifBlank { null },
     )
 
@@ -99,7 +132,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         if (body != null) {
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.outputStream.use { it.write(body.toString().toByteArray()) }
+            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
         }
         if (!accessToken.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $accessToken")
         val code = connection.responseCode
@@ -107,6 +140,6 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         connection.disconnect()
         if (code !in 200..299) throw IllegalStateException("RSS host API request failed ($code). ${text.take(180)}")
-        return JSONObject(text)
+        return if (text.isBlank()) JSONObject() else JSONObject(text)
     }
 }
