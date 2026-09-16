@@ -2,6 +2,7 @@ package com.riyaz.rssdownloader
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -43,7 +44,12 @@ class MainActivity : AppCompatActivity() {
         startDownloadKeepAlive()
         requestNotificationPermissionIfNeeded()
         buildApp()
-        readClipboardUrl()
+        readClipboardUrl(autoAnalyze = true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::urlInput.isInitialized) readClipboardUrl(autoAnalyze = true)
     }
 
     private fun buildApp() {
@@ -250,11 +256,19 @@ class MainActivity : AppCompatActivity() {
         addView(sw)
     }
 
-    private fun readClipboardUrl() {
-        if (!prefs.getBoolean("clipboard", true)) return
+    private fun readClipboardUrl(autoAnalyze: Boolean = false) {
+        if (!prefs.getBoolean("clipboard", true) || !::urlInput.isInitialized) return
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val text = cm.primaryClip?.takeIf { cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true }?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
-        if (text.startsWith("http://") || text.startsWith("https://")) { currentTab="social-downloader"; showHome(); urlInput.setText(text) }
+        if (text.startsWith("http://") || text.startsWith("https://")) {
+            val previous = prefs.getString("lastClipboardUrl", "")
+            currentTab = "social-downloader"
+            if (urlInput.text.toString() != text) urlInput.setText(text)
+            if (autoAnalyze && previous != text) {
+                prefs.edit().putString("lastClipboardUrl", text).apply()
+                urlInput.postDelayed({ if (!isFinishing && currentTab == "social-downloader") analyzeUrl() }, 120)
+            }
+        }
     }
 
     private fun toggleMenu() { val lp = sideMenu.layoutParams as FrameLayout.LayoutParams; lp.width = if (lp.width == dp(76)) dp(300) else dp(76); sideMenu.layoutParams = lp }
