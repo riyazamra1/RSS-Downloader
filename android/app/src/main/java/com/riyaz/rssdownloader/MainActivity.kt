@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg())
-            setPadding(0, 0, 0, dp(88))
+            setPadding(0, 0, 0, 0)
         }
         root.addView(buildTopBar())
         content = FrameLayout(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
@@ -99,10 +99,18 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 setPadding(dp(3), dp(8), dp(3), dp(7))
                 background = rounded(if (selected) surface2() else Color.TRANSPARENT, 16)
+                alpha = if (selected) 1f else 0.78f
             }
             item.addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "🎬" else "▶", 19, textColor(), false))
             item.addView(text(tabLabel(id), 9, if (selected) textColor() else muted(), true))
-            item.setOnClickListener { currentTab = id; showHome() }
+            item.setOnClickListener {
+                if (currentTab == id) return@setOnClickListener
+                currentTab = id
+                item.animate().scaleX(0.94f).scaleY(0.94f).setDuration(70).withEndAction {
+                    item.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+                }.start()
+                showHome()
+            }
             addView(item, LinearLayout.LayoutParams(0, dp(58), 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
         }
         addView(LinearLayout(this@MainActivity).apply {
@@ -110,9 +118,14 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             addView(text("⚙", 19, muted(), false))
             addView(text("Settings", 9, muted(), true))
-            setOnClickListener { showSettings() }
+            setOnClickListener {
+                animate().scaleX(0.94f).scaleY(0.94f).setDuration(70).withEndAction {
+                    animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+                }.start()
+                showSettings()
+            }
         }, LinearLayout.LayoutParams(0, dp(58), 1f))
-        layoutParams = FrameLayout.LayoutParams(-1, dp(78), Gravity.BOTTOM).apply { setMargins(dp(10), 0, dp(10), dp(8)) }
+        layoutParams = LinearLayout.LayoutParams(-1, dp(78)).apply { setMargins(dp(10), 0, dp(10), 0) }
     }
 
     private fun showHome() {
