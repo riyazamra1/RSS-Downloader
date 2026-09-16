@@ -1,0 +1,44 @@
+name: patch-ui
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/app/src/main/java/com/riyaz/rssdownloader/NativeHostApi.kt'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch Android UI and clipboard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt')
+          s=p.read_text()
+          s=s.replace('private var tabOrder = TabOrder.defaults.toMutableList()','private var tabOrder = TabOrder.defaults.toMutableList()\n    private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null')
+          s=s.replace('        buildApp()\n        readClipboardUrl(true)','        buildApp()\n        registerClipboardListener()\n        readClipboardUrl(true)')
+          s=s.replace('        imageExecutor.shutdownNow()\n        super.onDestroy()','        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager\n        clipboardListener?.let(cm::removePrimaryClipChangedListener)\n        imageExecutor.shutdownNow()\n        super.onDestroy()')
+          start=s.index('    private fun buildBottomNav(): View =')
+          end=s.index('\nprivate fun showTabOrderDialog()', start)
+          new='''    private fun buildBottomNav(): View = LinearLayout(this).apply {\n        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL\n        setPadding(dp(7), dp(7), dp(7), dp(8)); background = rounded(surface(), 24); elevation = dp(10).toFloat()\n        layoutParams = LinearLayout.LayoutParams(-1, dp(76)).apply { setMargins(dp(10), 0, dp(10), dp(8)) }\n        tabOrder.forEach { id ->\n            val selected = id == currentTab\n            val item = LinearLayout(this@MainActivity).apply {\n                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(3), dp(5), dp(3), dp(4))\n                background = rounded(if (selected) surface2() else Color.TRANSPARENT, 18)\n                addView(text(if (id == TabOrder.SOCIAL) "⇩" else if (id == TabOrder.TAMIL) "▣" else "▶", 20, if (selected) accent() else muted(), true))\n                addView(text(if (id == TabOrder.SOCIAL) "Social" else if (id == TabOrder.TAMIL) "Tamil" else "Dubbed", 10, if (selected) textColor() else muted(), true))\n                setOnClickListener { if (currentTab != id) { currentTab = id; refreshBottomNav(); showHome() } }\n                setOnLongClickListener { showTabOrderDialog(); true }\n            }\n            addView(item, LinearLayout.LayoutParams(0, dp(60), 1f).apply { setMargins(dp(3), 0, dp(3), 0) })\n        }\n        addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(text("⚙", 20, muted(), true)); addView(text("Settings", 10, muted(), true)); setOnClickListener { showSettings() } }, LinearLayout.LayoutParams(0, dp(60), .82f))\n    }\n\n    private fun refreshBottomNav() {\n        if (!::root.isInitialized || root.childCount < 3) return\n        root.removeViewAt(2); root.addView(buildBottomNav(), 2)\n    }\n'''
+          s=s[:start]+new+s[end:]
+          s=s.replace('api.search(tab, "") { result -> runOnUiThread {','api.search(tab, "latest Tamil movies 2026") { result -> runOnUiThread {')
+          marker='    private fun readClipboardUrl(autoAnalyze: Boolean) {'
+          listener='''    private fun registerClipboardListener() {\n        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager\n        clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {\n            if (!isFinishing && prefs.getBoolean("clipboard", true)) runOnUiThread { readClipboardUrl(true) }\n        }\n        cm.addPrimaryClipChangedListener(clipboardListener)\n    }\n\n'''
+          if marker in s and 'private fun registerClipboardListener()' not in s: s=s.replace(marker,listener+marker)
+          s=s.replace('if (currentTab != TabOrder.SOCIAL) { currentTab = TabOrder.SOCIAL; showHome() }','if (currentTab != TabOrder.SOCIAL) { currentTab = TabOrder.SOCIAL; refreshBottomNav(); showHome() }')
+          p.write_text(s)
+          PY
+          ./gradlew -p android :app:assembleDebug
+          git config user.name 'RSS Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt
+          git commit -m 'fix(ui): polish navigation and live clipboard paste' || true
+          git push
+          git rm .github/workflows/patch-ui.yml
+          git commit -m 'chore(ci): remove temporary UI patch workflow' || true
+          git push || true
