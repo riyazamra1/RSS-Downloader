@@ -33,7 +33,6 @@ class MainActivity : AppCompatActivity() {
     private val imageExecutor = Executors.newFixedThreadPool(3)
     private lateinit var root: LinearLayout
     private lateinit var content: FrameLayout
-    private lateinit var sideMenu: LinearLayout
     private lateinit var urlInput: EditText
     private lateinit var stateText: TextView
     private lateinit var mediaPanel: LinearLayout
@@ -71,19 +70,14 @@ class MainActivity : AppCompatActivity() {
         content = FrameLayout(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
         root.addView(content)
         root.addView(buildBottomNav())
-        sideMenu = buildSideMenu()
-        val frame = FrameLayout(this)
-        frame.addView(root)
-        frame.addView(sideMenu, FrameLayout.LayoutParams(dp(76), -1))
-        setContentView(frame)
+        setContentView(root)
         showHome()
     }
 
     private fun buildTopBar(): View = LinearLayout(this).apply {
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(88), dp(10), dp(12), dp(10))
+        setPadding(dp(16), dp(10), dp(12), dp(10))
         layoutParams = LinearLayout.LayoutParams(-1, dp(74))
-        addView(button("☰", 46) { toggleMenu() })
         addView(logoView(44), LinearLayout.LayoutParams(dp(44), dp(44)).apply { setMargins(dp(12), 0, dp(12), 0) })
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -121,33 +115,10 @@ class MainActivity : AppCompatActivity() {
         layoutParams = FrameLayout.LayoutParams(-1, dp(78), Gravity.BOTTOM).apply { setMargins(dp(10), 0, dp(10), dp(8)) }
     }
 
-    private fun buildSideMenu(): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(surface())
-        elevation = dp(18).toFloat()
-        addView(button("☰", 48) { toggleMenu() }, LinearLayout.LayoutParams(-1, dp(78)))
-        addView(menuItem("↓", "Downloads") { showDownloads(); closeMenu() })
-        addView(text("APPEARANCE", 10, muted(), true).apply { setPadding(dp(14), dp(18), 0, dp(6)) })
-        addView(menuItem("☾", "Light mode") {
-            lightMode = !lightMode
-            prefs.edit().putBoolean("light", lightMode).apply()
-            recreate()
-        })
-        addView(menuItem("⚙", "Settings") { showSettings(); closeMenu() })
-    }
-
-    private fun menuItem(icon: String, label: String, action: () -> Unit): View = LinearLayout(this).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(13), dp(14), dp(8), dp(14))
-        addView(text(icon, 20, textColor(), false), LinearLayout.LayoutParams(dp(30), -1))
-        addView(text(label, 15, textColor(), true))
-        setOnClickListener { action() }
-    }
-
     private fun showHome() {
         content.removeAllViews()
         val scroll = ScrollView(this).apply { isFillViewport = true }
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(94), dp(10), dp(18), dp(18)) }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(10), dp(18), dp(18)) }
         if (currentTab == TabOrder.SOCIAL) buildSocial(box) else buildMovie(box, currentTab)
         scroll.addView(box)
         content.addView(scroll)
@@ -287,7 +258,7 @@ class MainActivity : AppCompatActivity() {
     private fun showDownloads() {
         content.removeAllViews()
         val scroll = ScrollView(this)
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(94), dp(18), dp(18), dp(18)) }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)) }
         box.addView(text("DOWNLOADS", 10, Color.rgb(140, 156, 255), true))
         box.addView(text("Downloads", 30, textColor(), true))
         box.addView(secondaryButton("Refresh") { showDownloads() }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(12) })
@@ -320,7 +291,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSettings() {
         content.removeAllViews()
         val scroll = ScrollView(this)
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(94), dp(18), dp(18), dp(18)) }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)) }
         box.addView(text("RSS DOWNLOADER", 10, Color.rgb(140, 156, 255), true))
         box.addView(text("Settings", 30, textColor(), true))
         box.addView(settingRow("Appearance", "Use light or dark interface", lightMode) { lightMode = it; prefs.edit().putBoolean("light", it).apply(); recreate() })
@@ -406,8 +377,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toggleMenu() { val lp = sideMenu.layoutParams as FrameLayout.LayoutParams; lp.width = if (lp.width == dp(76)) dp(300) else dp(76); sideMenu.layoutParams = lp }
-    private fun closeMenu() { (sideMenu.layoutParams as FrameLayout.LayoutParams).also { it.width = dp(76); sideMenu.layoutParams = it } }
     private fun tabLabel(id: String) = when (id) { TabOrder.SOCIAL -> "Social Downloader"; TabOrder.TAMIL -> "Tamil Movies"; else -> "Tamil Dubbed Movies" }
     private fun applyTheme() { window.statusBarColor = bg(); window.navigationBarColor = bg() }
     private fun bg() = Color.parseColor(if (lightMode) "#F4F6FB" else "#070B16")
