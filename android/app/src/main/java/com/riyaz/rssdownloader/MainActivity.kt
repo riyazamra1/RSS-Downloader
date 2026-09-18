@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         if (::urlInput.isInitialized) readClipboardUrl(true)
     }
 
-    override fun onDestroy() {
+    override fun onBackPressed() { if(drawerOpen){root.findViewWithTag<View>("rss_drawer_overlay")?.let{closeMenu(it)};return};super.onBackPressed() }\n\n    override fun onDestroy() {
         imageExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -69,15 +69,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildTopBar(): View = LinearLayout(this).apply {
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(16), dp(10), dp(12), dp(10))
+        setPadding(dp(10), dp(10), dp(12), dp(10))
         layoutParams = LinearLayout.LayoutParams(-1, dp(74))
-        addView(logoView(44), LinearLayout.LayoutParams(dp(44), dp(44)).apply { setMargins(dp(12), 0, dp(12), 0) })
+        addView(button("☰", 46) { showMenu() }, LinearLayout.LayoutParams(dp(46), dp(46)))
+        addView(logoView(44), LinearLayout.LayoutParams(dp(44), dp(44)).apply { setMargins(dp(10), 0, dp(12), 0) })
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(text("RSS Downloader", 17, textColor(), true))
             addView(text("Fast. Organized. Controlled.", 11, muted(), false))
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(button("⚙", 46) { showSettings() })
+        addView(button("⚙", 46) { showSettings() }, LinearLayout.LayoutParams(dp(46), dp(46)))
     }
 
     // Clean fixed navigation: no floating pill, no oversized container, and no duplicate Settings tab.
@@ -314,27 +315,71 @@ class MainActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) })
     }
 
+    private fun showMenu() {
+        if (drawerOpen) return
+        drawerOpen=true
+        val overlay=FrameLayout(this).apply{tag="rss_drawer_overlay";setBackgroundColor(Color.argb(if(lightMode)55 else 90,0,0,0));setOnClickListener{closeMenu(this)}}
+        val drawer=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(18),dp(14),dp(14));background=rounded(surface(),28);elevation=dp(18).toFloat();setOnClickListener{}}
+        drawer.addView(panel().apply{gravity=Gravity.CENTER_HORIZONTAL;setPadding(dp(14),dp(18),dp(14),dp(16));addView(logoView(78),LinearLayout.LayoutParams(dp(78),dp(78)));addView(text("WELCOME BACK",10,accent(),true).apply{setPadding(0,dp(10),0,dp(0))});addView(text(prefs.getString("name","USER").orEmpty().ifBlank{"USER"},18,textColor(),true));prefs.getString("email","").orEmpty().takeIf{it.isNotBlank()}?.let{addView(text(it,10,muted(),false))}})
+        drawer.addView(text("MAIN",10,muted(),true).apply{setPadding(dp(8),dp(18),dp(8),dp(6))})
+        drawer.addView(menuItem("⌂","Home",currentTab==TabOrder.SOCIAL){closeMenu(overlay);currentTab=TabOrder.SOCIAL;showHome()})
+        drawer.addView(menuItem("↗","Social Downloader",currentTab==TabOrder.SOCIAL){closeMenu(overlay);currentTab=TabOrder.SOCIAL;showHome()})
+        drawer.addView(menuItem("◉","Tamil Movies",currentTab==TabOrder.TAMIL){closeMenu(overlay);currentTab=TabOrder.TAMIL;showHome()})
+        drawer.addView(menuItem("▣","Tamil Dubbed Movies",currentTab==TabOrder.DUBBED){closeMenu(overlay);currentTab=TabOrder.DUBBED;showHome()})
+        drawer.addView(text("SUPPORT",10,muted(),true).apply{setPadding(dp(8),dp(16),dp(8),dp(6))})
+        drawer.addView(menuItem("⇩","Downloads",false){closeMenu(overlay);showDownloads()})
+        drawer.addView(menuItem("⚙","Settings",false){closeMenu(overlay);showSettings()})
+        drawer.addView(Space(this).apply{layoutParams=LinearLayout.LayoutParams(1,0,1f)})
+        drawer.addView(panel().apply{setPadding(dp(12),dp(12),dp(12),dp(12));addView(text("RAZEEN SECURE SOLUTION",13,textColor(),true));addView(text("Mobile & PC Software • CCTV • Networking",9,muted(),false).apply{setPadding(0,dp(3),0,0)});addView(text("www.rsscctvsolution.eu.cc",10,accent(),false).apply{setPadding(0,dp(5),0,0)})})
+        overlay.addView(drawer,FrameLayout.LayoutParams(dp(320),-1).apply{gravity=Gravity.START});root.addView(overlay,FrameLayout.LayoutParams(-1,-1))
+    }
+    private fun menuItem(icon:String,title:String,selected:Boolean,onClick:()->Unit):View=LinearLayout(this).apply{
+        gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(9),dp(10),dp(9));background=rounded(if(selected)Color.argb(26,Color.red(accent()),Color.green(accent()),Color.blue(accent())) else Color.TRANSPARENT,18);setOnClickListener{onClick()}
+        addView(TextView(this@MainActivity).apply{text=icon;textSize=19f;gravity=Gravity.CENTER;setTextColor(accent());background=rounded(surface2(),13)},LinearLayout.LayoutParams(dp(38),dp(38)))
+        addView(text(title,14,textColor(),selected),LinearLayout.LayoutParams(0,dp(44),1f).apply{setMargins(dp(12),0,0,0)})
+        if(selected)addView(View(this@MainActivity).apply{setBackgroundColor(accent())},LinearLayout.LayoutParams(dp(6),dp(6)))
+    }
+    private fun closeMenu(overlay:View){drawerOpen=false;root.removeView(overlay)}
+
     private fun showSettings() {
         content.removeAllViews()
         val scroll = ScrollView(this)
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)) }
-        box.addView(text("RSS DOWNLOADER", 10, Color.rgb(140, 156, 255), true))
-        box.addView(text("Settings", 30, textColor(), true))
-        box.addView(settingRow("Appearance", "Use light or dark interface", lightMode) { lightMode = it; prefs.edit().putBoolean("light", it).apply(); recreate() })
-        box.addView(settingRow("Auto-paste copied URL", "Detect a copied HTTP(S) URL when RSS Downloader is active", prefs.getBoolean("clipboard", true)) { prefs.edit().putBoolean("clipboard", it).apply() })
-        box.addView(text("TAB ORDER", 10, muted(), true).apply { setPadding(dp(18), dp(18), 0, dp(6)) })
-        tabOrder.forEachIndexed { index, id ->
-            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(8), dp(8), dp(8)); background = rounded(surface(), 14) }
-            row.addView(text(tabShortLabel(id), 13, textColor(), true), LinearLayout.LayoutParams(dp(54), dp(48)))
-            row.addView(text(tabLabel(id), 14, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(secondaryButton("↑") { moveTab(index, -1) }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
-            row.addView(secondaryButton("↓") { moveTab(index, 1) }, LinearLayout.LayoutParams(dp(48), dp(44)))
-            box.addView(row, LinearLayout.LayoutParams(-1, dp(64)).apply { setMargins(dp(18), dp(4), dp(18), dp(4)) })
+        val box = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(18),dp(18),dp(28)) }
+        box.addView(panel().apply {
+            gravity=Gravity.CENTER_HORIZONTAL; setPadding(dp(18),dp(20),dp(18),dp(20))
+            addView(logoView(64),LinearLayout.LayoutParams(dp(64),dp(64)))
+            addView(text("RSS DOWNLOADER",20,textColor(),true).apply{setPadding(0,dp(8),0,0)})
+            addView(text("SETTINGS",11,muted(),true).apply{setPadding(0,dp(3),0,0)})
+        })
+        box.addView(text("GENERAL",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
+        box.addView(settingCard("☀","Appearance","Light / dark interface • saved automatically",lightMode){lightMode=it;prefs.edit().putBoolean("light",it).apply();recreate()})
+        box.addView(settingCard("↗","Auto-paste copied URL","Detect and analyze a copied HTTP(S) URL",prefs.getBoolean("clipboard",true)){prefs.edit().putBoolean("clipboard",it).apply()})
+        box.addView(text("TAB ORDER",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
+        tabOrder.forEachIndexed{index,id->
+            val row=panel().apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(8),dp(8),dp(8))}
+            row.addView(text(tabShortLabel(id),13,textColor(),true),LinearLayout.LayoutParams(dp(54),dp(48)))
+            row.addView(text(tabLabel(id),14,textColor(),true),LinearLayout.LayoutParams(0,-2,1f))
+            row.addView(secondaryButton("↑"){moveTab(index,-1)},LinearLayout.LayoutParams(dp(48),dp(44)).apply{setMargins(dp(4),0,dp(4),0)})
+            row.addView(secondaryButton("↓"){moveTab(index,1)},LinearLayout.LayoutParams(dp(48),dp(44)))
+            box.addView(row,LinearLayout.LayoutParams(-1,dp(64)).apply{setMargins(0,dp(4),0,dp(4))})
         }
-        box.addView(secondaryButton("Reset tab order") { tabOrder = TabOrder.defaults.toMutableList(); prefs.edit().remove("tabOrder").apply(); currentTab = TabOrder.SOCIAL; showSettings() }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
-        scroll.addView(box)
-        content.addView(scroll)
+        box.addView(secondaryButton("Reset tab order"){tabOrder=TabOrder.defaults.toMutableList();prefs.edit().remove("tabOrder").apply();currentTab=TabOrder.SOCIAL;showSettings()},LinearLayout.LayoutParams(-1,dp(48)))
+        box.addView(text("RSS CORE",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
+        box.addView(panel().apply{addView(text("RSS Core Host",14,textColor(),true));addView(text(BuildConfig.RSS_HOST_BASE_URL,12,muted(),false).apply{setPadding(0,dp(4),0,0)});addView(text("Build-controlled host. Changing it requires a new build.",10,muted(),false).apply{setPadding(0,dp(4),0,0)})})
+        box.addView(text("PRIVACY & ACCESS",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
+        box.addView(panel().apply{addView(text("Internet • Storage / media • Notifications",13,textColor(),true));addView(text("Required Android permissions are declared in the manifest.",10,muted(),false).apply{setPadding(0,dp(5),0,0)})})
+        box.addView(text("RAZEEN SECURE SOLUTION",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
+        box.addView(panel().apply{gravity=Gravity.CENTER_HORIZONTAL;setPadding(dp(16),dp(18),dp(16),dp(18));addView(logoView(58),LinearLayout.LayoutParams(dp(58),dp(58)));addView(text("RAZEEN SECURE SOLUTION",15,textColor(),true).apply{setPadding(0,dp(8),0,0)});addView(text("Mobile & PC Software • CCTV • Networking",10,muted(),false).apply{setPadding(0,dp(4),0,0)});addView(text("077 115 5504  •  070 155 5504",11,accent(),true).apply{setPadding(0,dp(7),0,0)});addView(text("rsscctvsolution@gmail.com",11,accent(),false).apply{setPadding(0,dp(3),0,0)});addView(text("www.rsscctvsolution.eu.cc",11,accent(),false).apply{setPadding(0,dp(3),0,0)})})
+        scroll.addView(box);content.addView(scroll)
     }
+
+    private fun settingCard(icon:String,title:String,subtitle:String,checked:Boolean,onChanged:(Boolean)->Unit):View=panel().apply{
+        orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(14),dp(10),dp(10),dp(10))
+        addView(TextView(this@MainActivity).apply{text=icon;textSize=18f;gravity=Gravity.CENTER;setTextColor(accent());background=rounded(surface2(),13)},LinearLayout.LayoutParams(dp(42),dp(42)))
+        addView(LinearLayout(this@MainActivity).apply{orientation=LinearLayout.VERTICAL;addView(text(title,14,textColor(),true));addView(text(subtitle,10,muted(),false).apply{setPadding(0,dp(3),0,0)})},LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(dp(12),0,dp(6),0)})
+        addView(Switch(this@MainActivity).apply{isChecked=checked;setOnCheckedChangeListener{_,v->onChanged(v)}})
+    }
+
 
     private fun moveTab(index: Int, delta: Int) {
         val target = index + delta
