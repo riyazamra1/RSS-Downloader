@@ -70,7 +70,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         status.text="Connecting to RSS License Server…"; name.isEnabled=false; email.isEnabled=false
         executor.execute {
             val result=runCatching {
-                val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd("/")+"/api/v1/license/register").openConnection() as HttpURLConnection
+                val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/register").openConnection() as HttpURLConnection
                 c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
                 c.setRequestProperty("content-type","application/json")
                 val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
@@ -112,7 +112,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun attach(){root.removeView(card);root.addView(card,FrameLayout.LayoutParams(-1,-2).apply{gravity=Gravity.CENTER;setMargins(18.dp(),18.dp(),18.dp(),18.dp())})}
     private fun glass()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24.dp(),24.dp(),24.dp(),24.dp());background=GradientDrawable().apply{setColor(Color.argb(190,18,24,48));cornerRadius=28.dp().toFloat();setStroke(1.dp(),Color.argb(85,255,255,255))};elevation=10.dp().toFloat()}
     private fun logo()=ImageView(this).apply{setImageResource(R.drawable.rss_downloader_logo);scaleType=ImageView.ScaleType.CENTER_INSIDE;contentDescription="RSS Downloader"}
-    private fun input(h:String)=EditText(this).apply{hint=h;hintTextColor=Color.rgb(145,155,180);setTextColor(Color.WHITE);setSingleLine();setPadding(16.dp(),0,16.dp(),0);background=GradientDrawable().apply{setColor(Color.argb(100,255,255,255));cornerRadius=16.dp().toFloat()}}
+    private fun input(h:String)=EditText(this).apply{hint=h;setHintTextColor(Color.rgb(145,155,180));setTextColor(Color.WHITE);setSingleLine();setPadding(16.dp(),0,16.dp(),0);background=GradientDrawable().apply{setColor(Color.argb(100,255,255,255));cornerRadius=16.dp().toFloat()}}
     private fun button(s:String)=TextView(this).apply{text=s;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=android.graphics.Typeface.DEFAULT_BOLD;background=GradientDrawable().apply{setColor(Color.rgb(91,108,240));cornerRadius=16.dp().toFloat()}}
     private fun t(s:String,z:Int,b:Boolean)=TextView(this).apply{text=s;textSize=z.toFloat();setTextColor(Color.WHITE);typeface=if(b)android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT}
     private fun Int.dp()=(this*resources.displayMetrics.density).toInt()
