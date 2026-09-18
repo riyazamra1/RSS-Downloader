@@ -77,9 +77,10 @@ s = s[:start] + nav + s[end:]
 s = s.replace('secondaryButton("↑")', 'iconButton(android.R.drawable.arrow_up_float, 44, "Move up")')
 s = s.replace('secondaryButton("↓")', 'iconButton(android.R.drawable.arrow_down_float, 44, "Move down")')
 
-# These are behaviors, not permanent explanatory labels.
-s = re.sub(r'\n        hero\.addView\(text\("Paste a link\\nRSS handles the rest\..*?\)\)', '', s, count=1, flags=re.S)
-s = re.sub(r'\n        hero\.addView\(text\("Copied HTTP\(S\) links are detected automatically while RSS Downloader is active\.".*?\)\)', '', s, count=1, flags=re.S)
+# Keep the hero compact. Use exact Kotlin source replacements rather than fragile
+# regexes around nested apply{} blocks.
+s = s.replace('        hero.addView(text("Paste a link.\\nRSS handles the rest.", 34, textColor(), true).apply { setPadding(0, dp(4), 0, dp(8)) })\\n', '')
+s = s.replace('        hero.addView(text("Copied HTTP(S) links are detected automatically while RSS Downloader is active.", 13, muted(), false))\\n', '')
 
 # Clipboard handling: accept URI clips and ordinary text clips.
 s = s.replace('        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager\n        val clip = cm.primaryClip ?: return\n        if (cm.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) != true) return\n        val value = clip.getItemAt(0).coerceToText(this).toString().trim()', '        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager\n        val clip = cm.primaryClip ?: return\n        val item = clip.getItemAt(0)\n        val value = (item.text?.toString() ?: item.coerceToText(this).toString()).trim()')
@@ -103,15 +104,17 @@ if old:
 
 s = s.replace('items.forEach { item ->\n                    grid.addView(movieCard(item.title, item.year ?: 2026, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })\n                }', 'items.forEach { item ->\n                    grid.addView(movieCard(item, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })\n                }')
 
+# Build-time guard: fail only if the legacy source constructs remain.
 for forbidden in (
     'button("⚙"',
     'secondaryButton("↑"',
     'secondaryButton("↓"',
-    'Paste a link.\\nRSS handles the rest.',
-    'Copied HTTP(S) links are detected automatically while RSS Downloader is active.',
+    'hero.addView(text("Paste a link.',
+    'hero.addView(text("Copied HTTP(S) links are detected automatically',
 ):
     if forbidden in s:
         raise SystemExit(f"Legacy UI remains: {forbidden}")
+
 
 main.write_text(s, encoding="utf-8")
 print("Android release source normalized and validated.")
