@@ -131,9 +131,7 @@ class MainActivity : AppCompatActivity() {
     private fun buildSocial(box: LinearLayout) {
         val hero = panel().apply { setPadding(dp(24), dp(24), dp(24), dp(20)) }
         hero.addView(text("SOCIAL DOWNLOADER", 10, Color.rgb(140, 156, 255), true))
-        hero.addView(text("Paste a link.\nRSS handles the rest.", 34, textColor(), true).apply { setPadding(0, dp(4), 0, dp(8)) })
-        hero.addView(text("Copied HTTP(S) links are detected automatically while RSS Downloader is active.", 13, muted(), false))
-        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(20), 0, 0) }
+                val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(20), 0, 0) }
         urlInput = EditText(this).apply { hint = "Paste URL here…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); setPadding(dp(16), 0, dp(16), 0); background = rounded(bg(), 14) }
         row.addView(urlInput, LinearLayout.LayoutParams(0, dp(54), 1f))
         row.addView(primaryButton("Analyze") { analyzeUrl() }, LinearLayout.LayoutParams(dp(120), dp(54)).apply { setMargins(dp(10), 0, 0, 0) })
