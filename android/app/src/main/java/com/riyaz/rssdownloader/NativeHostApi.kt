@@ -64,6 +64,8 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         val c = URL(url).openConnection() as HttpURLConnection
         return try {
             c.requestMethod = method; c.connectTimeout = 15000; c.readTimeout = 30000; c.instanceFollowRedirects = true; c.setRequestProperty("Accept", "application/json")
+            // RSS Core identifies the calling product separately from the per-user app key.
+            c.setRequestProperty("X-RSS-App-Id", "rss-downloader")
             if (body != null) { c.doOutput = true; c.setRequestProperty("Content-Type", "application/json"); c.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) } }
             if (!accessToken.isNullOrBlank()) c.setRequestProperty("Authorization", "Bearer $accessToken")
             if (!appKey.isNullOrBlank()) c.setRequestProperty("X-RSS-App-Key", appKey)
