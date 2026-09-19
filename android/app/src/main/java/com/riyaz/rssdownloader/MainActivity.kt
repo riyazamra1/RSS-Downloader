@@ -185,15 +185,98 @@ class MainActivity : AppCompatActivity() {
         }}
     }
 
+
     private fun movieCard(item: NativeHostApi.SearchResult, tab: String): View = panel().apply {
-        orientation = LinearLayout.VERTICAL
-        val image = ImageView(this@MainActivity).apply { setImageResource(R.drawable.rss_downloader_logo); scaleType = ImageView.ScaleType.CENTER_CROP; contentDescription = item.title }
-        addView(image, LinearLayout.LayoutParams(-1, dp(145)))
+        setPadding(0, 0, 0, dp(14))
+        isClickable = true
+        setOnClickListener { showMovieDetails(item, tab) }
+        val image = ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.rss_downloader_logo)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = item.title
+        }
+        addView(image, LinearLayout.LayoutParams(-1, dp(220)))
         loadImage(item.thumbnailUrl, image)
         if (item.thumbnailUrl.isNullOrBlank()) loadWikipediaPoster(item.title, image)
-        addView(text(item.title, 15, textColor(), true).apply { setPadding(dp(13), dp(7), dp(13), 0) })
-        addView(text("${item.year ?: 2026} • Authorized provider options", 11, muted(), false).apply { setPadding(dp(13), 0, dp(13), dp(7)) })
-        addView(secondaryButton("Get options") { movieSearch(tab, item.title) }, LinearLayout.LayoutParams(-1, dp(46)).apply { setMargins(dp(13), 0, dp(13), dp(13)) })
+        val info = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), 0)
+        }
+        info.addView(text(item.title, 19, textColor(), true))
+        val facts = buildString {
+            item.year?.let { append(it) }
+            item.runtime?.takeIf { it.isNotBlank() }?.let { if (isNotEmpty()) append("  •  "); append(it) }
+            item.language?.takeIf { it.isNotBlank() }?.let { if (isNotEmpty()) append("  •  "); append(it) }
+        }
+        if (facts.isNotBlank()) info.addView(text(facts, 11, muted(), false).apply { setPadding(0, dp(4), 0, 0) })
+        item.rating?.let { rating ->
+            val source = item.ratingSource?.takeIf { it.isNotBlank() } ?: "Verified source"
+            info.addView(text("★ " + String.format(Locale.US, "%.1f", rating) + "/10  •  " + source, 13, accent(), true).apply { setPadding(0, dp(8), 0, 0) })
+        }
+        val chips = listOfNotNull(
+            item.genres.takeIf { it.isNotEmpty() }?.joinToString(" • "),
+            item.budget?.takeIf { it.isNotBlank() }?.let { "Budget " + it },
+            item.cost?.takeIf { it.isNotBlank() }?.let { "Cost " + it }
+        )
+        if (chips.isNotEmpty()) info.addView(text(chips.joinToString("  •  "), 10, muted(), false).apply { setPadding(0, dp(6), 0, 0) })
+        val buttons = LinearLayout(this@MainActivity).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(12), dp(16), 0) }
+        buttons.addView(primaryButton("Download") {
+            val requestId = item.requestId
+            if (requestId != null && item.mediaOptions.isNotEmpty()) renderOptions(buttons, requestId, item.mediaOptions)
+            else if (requestId != null) api.listMediaOptions(requestId) { result -> runOnUiThread {
+                result.onSuccess { options -> renderOptions(buttons, requestId, options) }
+                    .onFailure { toast(it.message ?: "Unable to load download options.") }
+            }} else toast("Download is not available for this movie yet.")
+        }, LinearLayout.LayoutParams(0, dp(46), 1f))
+        buttons.addView(secondaryButton("Details") { showMovieDetails(item, tab) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(dp(10), 0, 0, 0) })
+        addView(info)
+        addView(buttons)
+    }
+
+    private fun showMovieDetails(item: NativeHostApi.SearchResult, tab: String) {
+        content.removeAllViews()
+        val scroll = ScrollView(this)
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(16), dp(28)) }
+        box.addView(secondaryButton("← Back to " + tabLabel(tab)) { showHome() }, LinearLayout.LayoutParams(-1, dp(46)))
+        val hero = panel().apply { setPadding(0, 0, 0, dp(18)) }
+        val poster = ImageView(this).apply { setImageResource(R.drawable.rss_downloader_logo); scaleType = ImageView.ScaleType.CENTER_CROP; contentDescription = item.title }
+        hero.addView(poster, LinearLayout.LayoutParams(-1, dp(330)))
+        loadImage(item.thumbnailUrl, poster)
+        if (item.thumbnailUrl.isNullOrBlank()) loadWikipediaPoster(item.title, poster)
+        hero.addView(text(item.title, 24, textColor(), true).apply { setPadding(dp(18), dp(16), dp(18), 0) })
+        item.rating?.let { rating ->
+            val source = item.ratingSource?.takeIf { it.isNotBlank() } ?: "Verified source"
+            hero.addView(text("★ " + String.format(Locale.US, "%.1f", rating) + "/10  •  " + source, 14, accent(), true).apply { setPadding(dp(18), dp(7), dp(18), 0) })
+        }
+        val meta = listOfNotNull(item.year?.toString(), item.releaseDate?.takeIf { it.isNotBlank() }, item.runtime?.takeIf { it.isNotBlank() }, item.language?.takeIf { it.isNotBlank() }, item.genres.takeIf { it.isNotEmpty() }?.joinToString(", "))
+        if (meta.isNotEmpty()) hero.addView(text(meta.joinToString("  •  "), 11, muted(), false).apply { setPadding(dp(18), dp(7), dp(18), 0) })
+        if (!item.director.isNullOrBlank()) hero.addView(text("Director: " + item.director, 12, textColor(), true).apply { setPadding(dp(18), dp(10), dp(18), 0) })
+        if (!item.synopsis.isNullOrBlank()) hero.addView(text(item.synopsis, 13, muted(), false).apply { setPadding(dp(18), dp(12), dp(18), 0) })
+        val finance = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(4), dp(16), dp(4)) }
+        finance.addView(text("MOVIE DETAILS", 11, muted(), true).apply { setPadding(0, dp(12), 0, dp(8)) })
+        finance.addView(infoLine("Budget", item.budget))
+        finance.addView(infoLine("Cost / Box Office", item.cost))
+        if (item.rating == null) finance.addView(text("Rating: Not supplied by the movie data source.", 11, muted(), false).apply { setPadding(0, dp(8), 0, 0) })
+        box.addView(hero)
+        box.addView(panel().apply { addView(finance) })
+        if (item.requestId != null) {
+            box.addView(primaryButton("Download Movie") {
+                if (item.mediaOptions.isNotEmpty()) renderOptions(box, item.requestId, item.mediaOptions)
+                else api.listMediaOptions(item.requestId) { result -> runOnUiThread {
+                    result.onSuccess { options -> renderOptions(box, item.requestId, options) }
+                        .onFailure { toast(it.message ?: "Unable to load download options.") }
+                }}
+            }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) })
+        }
+        scroll.addView(box)
+        content.addView(scroll)
+    }
+
+    private fun infoLine(label: String, value: String?): View = LinearLayout(this).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(0, dp(6), 0, dp(6))
+        addView(text(label, 12, muted(), false), LinearLayout.LayoutParams(0, dp(34), 1f))
+        addView(text(value?.takeIf { it.isNotBlank() } ?: "Not available", 13, textColor(), true))
     }
 
     private fun analyzeUrl() {
