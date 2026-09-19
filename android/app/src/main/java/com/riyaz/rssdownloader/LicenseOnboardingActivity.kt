@@ -1,6 +1,12 @@
 package com.riyaz.rssdownloader
 
 import android.animation.ValueAnimator
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.view.View
+import android.text.Editable
+import android.text.TextWatcher
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -24,6 +30,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private lateinit var email: EditText
     private var page = 0
     private var animator: ValueAnimator? = null
+    private lateinit var registerButton: TextView
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -39,14 +46,46 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun background() {
         root = FrameLayout(this)
         root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(25,35,82), Color.rgb(5,9,22), Color.rgb(68,35,95)))
-        val mark = TextView(this).apply { text="RSS"; textSize=96f; gravity=Gravity.CENTER; setTextColor(Color.argb(35,255,255,255)) }
-        root.addView(mark, FrameLayout.LayoutParams(-1,-1))
+            intArrayOf(Color.rgb(10,18,42), Color.rgb(18,8,38), Color.rgb(5,24,34)))
+        val particles = ParticleBackground(this)
+        root.addView(particles, FrameLayout.LayoutParams(-1,-1))
         setContentView(root)
-        animator = ValueAnimator.ofFloat(-1f,1f).apply {
-            duration=6500; repeatCount=ValueAnimator.INFINITE; repeatMode=ValueAnimator.REVERSE
-            addUpdateListener { v -> val f=v.animatedValue as Float; mark.translationX=resources.displayMetrics.widthPixels*.16f*f; mark.translationY=resources.displayMetrics.heightPixels*.05f*f }
+        animator = ValueAnimator.ofFloat(0f,1f).apply {
+            duration=9000; repeatCount=ValueAnimator.INFINITE
+            addUpdateListener { particles.progress = animatedValue as Float; particles.invalidate() }
             start()
+        }
+    }
+
+    private class ParticleBackground(context: android.content.Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        var progress = 0f
+        private val points = Array(18) { i -> floatArrayOf(
+            (0.06f + ((i * 37) % 88) / 100f),
+            (0.08f + ((i * 61) % 84) / 100f),
+            2.5f + (i % 4)
+        ) }
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 1.2f
+            paint.color = Color.argb(34, 210, 230, 255)
+            val w=width.toFloat(); val h=height.toFloat()
+            val drift = (kotlin.math.sin(progress * Math.PI * 2) * 18f).toFloat()
+            for (i in 0 until 9) {
+                val y = h * (0.10f + i * 0.105f) + drift * (if (i % 2 == 0) 1 else -1)
+                val path=Path()
+                path.moveTo(-40f,y)
+                path.cubicTo(w*.25f,y-22f,w*.68f,y+22f,w+40f,y-8f)
+                canvas.drawPath(path,paint)
+            }
+            paint.style = Paint.Style.FILL
+            for (p in points) {
+                val x=w*p[0] + drift*(p[1]-0.5f)
+                val y=h*p[1] - drift*(p[0]-0.5f)
+                paint.color=Color.argb(42,220,240,255)
+                canvas.drawCircle(x,y,p[2],paint)
+            }
         }
     }
 
@@ -54,20 +93,29 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         background()
         card=glass(); card.addView(logo(),LinearLayout.LayoutParams(-1,80.dp()))
         card.addView(t("Welcome to RSS Downloader",25,true))
-        card.addView(t("Register once to activate this installation.",13,false))
         name=input("Customer name"); email=input("Email address")
         card.addView(name,LinearLayout.LayoutParams(-1,52.dp()).apply{bottomMargin=10.dp()})
         card.addView(email,LinearLayout.LayoutParams(-1,52.dp()).apply{bottomMargin=10.dp()})
-        card.addView(t("Internet connection is required for first registration.",11,false))
         status=t("",12,false); card.addView(status)
-        val b=button("Register & Continue"); card.addView(b,LinearLayout.LayoutParams(-1,52.dp()).apply{topMargin=12.dp()})
-        b.setOnClickListener{register()}; attach()
+        registerButton=button("Register & Continue")
+        registerButton.visibility=View.GONE
+        card.addView(registerButton,LinearLayout.LayoutParams(-1,52.dp()).apply{topMargin=12.dp()})
+        registerButton.setOnClickListener{register()}
+        val watcher=object: TextWatcher {
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){ updateRegisterButton() }
+            override fun afterTextChanged(s:Editable?){}
+        }
+        name.addTextChangedListener(watcher); email.addTextChangedListener(watcher)
+        attach()
+        updateRegisterButton()
     }
 
     private fun register() {
         val n=name.text.toString().trim(); val e=email.text.toString().trim()
         if(n.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()){status.text="Enter a name and valid email.";return}
-        status.text="Connecting to RSS License Server…"; name.isEnabled=false; email.isEnabled=false
+        registerButton.visibility=View.GONE
+        status.text="Registering…"; name.isEnabled=false; email.isEnabled=false
         executor.execute {
             val result=runCatching {
                 val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/register").openConnection() as HttpURLConnection
@@ -76,14 +124,34 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
                 c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
                 val code=c.responseCode; val txt=(if(code in 200..299)c.inputStream else c.errorStream).bufferedReader().use{it.readText()}
-                if(code !in 200..299) error(JSONObject(txt).optString("error","Registration failed"))
+                if(code !in 200..299) {
+                    val serverError=runCatching{JSONObject(txt).optString("error").ifBlank{JSONObject(txt).optString("message")}}.getOrNull().orEmpty()
+                    val message=when(code) {
+                        404 -> if(serverError.isNotBlank()) serverError else "RSS Core registration service was not found."
+                        408 -> "RSS Core registration timed out."
+                        429 -> "Too many registration attempts. Please try again shortly."
+                        else -> serverError.ifBlank{"Registration failed (HTTP $code)."}
+                    }
+                    error(message)
+                }
                 JSONObject(txt)
             }
             runOnUiThread {
                 result.onSuccess { r -> prefs.edit().putBoolean("registered",true).putString("customer_id",r.optString("customer_id")).putString("app_key",r.optString("app_key")).putString("display_name",n).putString("email",e).apply(); showOnboarding() }
-                    .onFailure { status.text=it.message ?: "Registration failed. Check Internet and retry."; name.isEnabled=true; email.isEnabled=true }
+                    .onFailure {
+                        status.text=it.message ?: "Registration failed. Please try again."
+                        name.isEnabled=true; email.isEnabled=true
+                        updateRegisterButton()
+                    }
             }
         }
+    }
+
+    private fun updateRegisterButton() {
+        if (!::registerButton.isInitialized) return
+        val valid=name.text.toString().trim().isNotBlank() &&
+            android.util.Patterns.EMAIL_ADDRESS.matcher(email.text.toString().trim()).matches()
+        registerButton.visibility=if(valid) View.VISIBLE else View.GONE
     }
 
     private fun showOnboarding() { background(); page=0; showPage() }
