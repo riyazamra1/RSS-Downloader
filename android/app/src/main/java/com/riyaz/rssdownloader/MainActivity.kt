@@ -53,7 +53,15 @@ class MainActivity : AppCompatActivity() {
         if (::urlInput.isInitialized) readClipboardUrl(true)
     }
 
-    override fun onBackPressed() { if(drawerOpen){root.findViewWithTag<View>("rss_drawer_overlay")?.let{closeMenu(it)};return};super.onBackPressed() }\n\n    override fun onDestroy() {
+    override fun onBackPressed() {
+        if (drawerOpen) {
+            root.findViewWithTag<View>("rss_drawer_overlay")?.let { closeMenu(it) }
+            return
+        }
+        super.onBackPressed()
+    }
+
+    override fun onDestroy() {
         imageExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -79,7 +87,7 @@ class MainActivity : AppCompatActivity() {
             addView(text("RSS Downloader", 17, textColor(), true))
             addView(text("Fast. Organized. Controlled.", 11, muted(), false))
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(button("⚙", 46) { showSettings() }, LinearLayout.LayoutParams(dp(46), dp(46)))
+        addView(iconButton(R.drawable.ic_rss_settings, 46, "Settings") { showSettings() }, LinearLayout.LayoutParams(dp(46), dp(46)))
     }
 
     // Clean fixed navigation: no floating pill, no oversized container, and no duplicate Settings tab.
@@ -95,7 +103,7 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(4), dp(6), dp(4), dp(4))
-                background = ColorDrawableCompat.transparent()
+                background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
                 setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
                 setOnLongClickListener { showTabOrderDialog(); true }
             }
@@ -113,8 +121,8 @@ class MainActivity : AppCompatActivity() {
         tabOrder.forEachIndexed { index, id ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
             row.addView(text("${index + 1}. ${tabLabel(id)}", 15, textColor(), true), LinearLayout.LayoutParams(0, dp(48), 1f))
-            row.addView(secondaryButton("↑") { if (index > 0) { val x = tabOrder.removeAt(index); tabOrder.add(index - 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
-            row.addView(secondaryButton("↓") { if (index < tabOrder.lastIndex) { val x = tabOrder.removeAt(index); tabOrder.add(index + 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)))
+            row.addView(iconButton(android.R.drawable.arrow_up_float, 44, "Move up") { if (index > 0) { val x = tabOrder.removeAt(index); tabOrder.add(index - 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
+            row.addView(iconButton(android.R.drawable.arrow_down_float, 44, "Move down") { if (index < tabOrder.lastIndex) { val x = tabOrder.removeAt(index); tabOrder.add(index + 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)))
             box.addView(row)
         }
         box.addView(secondaryButton("Reset default order") { prefs.edit().remove("tabOrder").apply(); recreate() }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(10) })
@@ -167,20 +175,21 @@ class MainActivity : AppCompatActivity() {
             result.onSuccess { items ->
                 if (items.isEmpty()) { grid.addView(text("No latest movies returned.", 13, muted(), false)); return@onSuccess }
                 items.forEach { item ->
-                    grid.addView(movieCard(item.title, item.year ?: 2026, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+                    grid.addView(movieCard(item, tab), LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
                 }
             }.onFailure { grid.addView(text(it.message ?: "Failed to load latest movies.", 13, muted(), false)) }
         }}
     }
 
-    private fun movieCard(title: String, year: Int, tab: String): View = panel().apply {
+    private fun movieCard(item: NativeHostApi.SearchResult, tab: String): View = panel().apply {
         orientation = LinearLayout.VERTICAL
-        val image = ImageView(this@MainActivity).apply { setImageResource(R.drawable.rss_downloader_logo); scaleType = ImageView.ScaleType.CENTER_CROP; contentDescription = title }
+        val image = ImageView(this@MainActivity).apply { setImageResource(R.drawable.rss_downloader_logo); scaleType = ImageView.ScaleType.CENTER_CROP; contentDescription = item.title }
         addView(image, LinearLayout.LayoutParams(-1, dp(145)))
-        loadWikipediaPoster(title, image)
-        addView(text(title, 15, textColor(), true).apply { setPadding(dp(13), dp(7), dp(13), 0) })
-        addView(text("$year • Authorized provider options", 11, muted(), false).apply { setPadding(dp(13), 0, dp(13), dp(7)) })
-        addView(secondaryButton("Get options") { movieSearch(tab, title) }, LinearLayout.LayoutParams(-1, dp(46)).apply { setMargins(dp(13), 0, dp(13), dp(13)) })
+        loadImage(item.thumbnailUrl, image)
+        if (item.thumbnailUrl.isNullOrBlank()) loadWikipediaPoster(item.title, image)
+        addView(text(item.title, 15, textColor(), true).apply { setPadding(dp(13), dp(7), dp(13), 0) })
+        addView(text("${item.year ?: 2026} • Authorized provider options", 11, muted(), false).apply { setPadding(dp(13), 0, dp(13), dp(7)) })
+        addView(secondaryButton("Get options") { movieSearch(tab, item.title) }, LinearLayout.LayoutParams(-1, dp(46)).apply { setMargins(dp(13), 0, dp(13), dp(13)) })
     }
 
     private fun analyzeUrl() {
@@ -458,6 +467,16 @@ class MainActivity : AppCompatActivity() {
     private fun accent() = Color.parseColor(if (lightMode) "#5969E8" else "#6C7CFF")
     private fun panel() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(surface(), 22); setPadding(dp(18), dp(18), dp(18), dp(18)); elevation = dp(3).toFloat(); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) } }
     private fun text(value: String, size: Int, color: Int, bold: Boolean) = TextView(this).apply { text = value; textSize = size.toFloat(); setTextColor(color); typeface = if (bold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT }
+    private fun iconButton(iconRes: Int, size: Int, description: String, onClick: () -> Unit) = ImageButton(this).apply {
+        setImageResource(iconRes)
+        imageTintList = android.content.res.ColorStateList.valueOf(textColor())
+        background = rounded(surface2(), 14)
+        contentDescription = description
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)).apply { setMargins(dp(2), 0, dp(2), 0) }
+    }
+
     private fun button(label: String, size: Int, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 20f; gravity = Gravity.CENTER; setTextColor(textColor()); background = rounded(surface2(), 14); setOnClickListener { onClick() }; layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)).apply { setMargins(0, 0, dp(8), 0) } }
     private fun primaryButton(label: String, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD; background = rounded(accent(), 12); setPadding(dp(14), 0, dp(14), 0); setOnClickListener { onClick() }; minimumWidth = dp(92) }
     private fun secondaryButton(label: String, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 13f; gravity = Gravity.CENTER; setTextColor(textColor()); typeface = android.graphics.Typeface.DEFAULT_BOLD; background = rounded(surface2(), 12); setPadding(dp(14), 0, dp(14), 0); setOnClickListener { onClick() }; minimumWidth = dp(92) }
