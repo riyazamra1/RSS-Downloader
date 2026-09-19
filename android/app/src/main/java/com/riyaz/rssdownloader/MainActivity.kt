@@ -25,7 +25,11 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader", MODE_PRIVATE) }
     // RSS Core is app-controlled. The host is no longer user-editable.
-    private val api by lazy { NativeHostApi(BuildConfig.RSS_HOST_BASE_URL, BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null }) }
+    private val api by lazy { NativeHostApi(
+        BuildConfig.RSS_HOST_BASE_URL,
+        BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null },
+        getSharedPreferences("rss-downloader-license", MODE_PRIVATE).getString("app_key", null)
+    ) }
     private val imageExecutor = Executors.newFixedThreadPool(4)
     private lateinit var root: LinearLayout
     private lateinit var content: FrameLayout
