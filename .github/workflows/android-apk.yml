@@ -1,4 +1,5 @@
-name: RSS Downloader Android APK\n# Native release build; source normalization must complete before compilation.
+name: RSS Downloader Android APK
+# Native release build; source normalization must complete before compilation.
 
 on:
   workflow_dispatch:
