@@ -8,7 +8,7 @@ import java.net.URLEncoder
 import java.util.concurrent.Executors
 
 /** Native Android implementation of the RSS Downloader host contract. */
-class NativeHostApi(private val baseUrl: String, private val accessToken: String? = null) {
+class NativeHostApi(private val baseUrl: String, private val accessToken: String? = null, private val appKey: String? = null) {
     // RSS Core compatibility: current and legacy downloader gateways are both accepted.
     data class MediaOption(val id: String, val kind: String, val format: String, val quality: String?, val sizeBytes: Long?)
     data class SearchResult(val id: String, val requestId: String?, val title: String, val year: Int?, val thumbnailUrl: String?, val qualities: List<String>, val mediaOptions: List<MediaOption>)
@@ -65,6 +65,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
             c.requestMethod = method; c.connectTimeout = 15000; c.readTimeout = 30000; c.instanceFollowRedirects = true; c.setRequestProperty("Accept", "application/json")
             if (body != null) { c.doOutput = true; c.setRequestProperty("Content-Type", "application/json"); c.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) } }
             if (!accessToken.isNullOrBlank()) c.setRequestProperty("Authorization", "Bearer $accessToken")
+            if (!appKey.isNullOrBlank()) c.setRequestProperty("X-RSS-App-Key", appKey)
             val code = c.responseCode; val stream = if (code in 200..299) c.inputStream else c.errorStream; code to (stream?.bufferedReader()?.use { it.readText() }.orEmpty())
         } finally { c.disconnect() }
     }
