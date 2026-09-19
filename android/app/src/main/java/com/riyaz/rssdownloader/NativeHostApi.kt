@@ -11,7 +11,7 @@ import java.util.concurrent.Executors
 class NativeHostApi(private val baseUrl: String, private val accessToken: String? = null, private val appKey: String? = null) {
     // RSS Core compatibility: current and legacy downloader gateways are both accepted.
     data class MediaOption(val id: String, val kind: String, val format: String, val quality: String?, val sizeBytes: Long?)
-    data class SearchResult(val id: String, val requestId: String?, val title: String, val year: Int?, val thumbnailUrl: String?, val qualities: List<String>, val mediaOptions: List<MediaOption>)
+    data class SearchResult(val id: String, val requestId: String?, val title: String, val year: Int?, val thumbnailUrl: String?, val qualities: List<String>, val mediaOptions: List<MediaOption>, val rating: Double?, val ratingSource: String?, val budget: String?, val cost: String?, val releaseDate: String?, val runtime: String?, val genres: List<String>, val language: String?, val director: String?, val synopsis: String?)
     data class Job(val jobId: String, val status: String, val progress: Int?, val title: String?, val thumbnailUrl: String?, val mediaKind: String?, val quality: String?, val format: String?, val downloadedBytes: Long?, val totalBytes: Long?, val speed: Long?, val eta: Long?, val error: String?)
     data class Analysis(val requestId: String, val title: String, val normalizedUrl: String, val thumbnailUrl: String?, val mediaOptions: List<MediaOption>)
 
@@ -31,7 +31,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
             val effectiveQuery = if (query.isBlank() && tab != TabOrder.SOCIAL) "latest Tamil movies 2026" else query
             val json = requestObject("/api/downloader/search", "POST", JSONObject().put("tab", tab).put("query", effectiveQuery))
             val results = mutableListOf<SearchResult>(); val array = json.optJSONArray("results") ?: JSONArray()
-            for (i in 0 until array.length()) { val item = array.getJSONObject(i); results += SearchResult(item.optString("id"), item.optString("requestId").ifBlank { null }, item.optString("title", "Untitled"), if (item.has("year") && !item.isNull("year")) item.optInt("year") else null, item.optString("thumbnailUrl", "").ifBlank { null }, jsonStringList(item.optJSONArray("qualities")), mediaOptions(item.optJSONArray("mediaOptions"))) }
+            for (i in 0 until array.length()) { val item = array.getJSONObject(i); results += SearchResult(item.optString("id"), item.optString("requestId").ifBlank { null }, item.optString("title", "Untitled"), if (item.has("year") && !item.isNull("year")) item.optInt("year") else null, item.optString("thumbnailUrl", "").ifBlank { null }, jsonStringList(item.optJSONArray("qualities")), mediaOptions(item.optJSONArray("mediaOptions")), numberOrNull(item, "rating"), item.optString("ratingSource", "").ifBlank { null }, item.optString("budget", "").ifBlank { null }, item.optString("cost", "").ifBlank { null }, item.optString("releaseDate", "").ifBlank { null }, item.optString("runtime", "").ifBlank { null }, jsonStringList(item.optJSONArray("genres")), item.optString("language", "").ifBlank { null }, item.optString("director", "").ifBlank { null }, item.optString("synopsis", "").ifBlank { null }) }
             results
         })
     }
@@ -43,6 +43,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     private fun mediaOptions(array: JSONArray?): List<MediaOption> { if (array == null) return emptyList(); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; val id = o.optString("id").ifBlank { o.optString("mediaOptionId") }; if (id.isBlank()) continue; add(MediaOption(id, o.optString("kind", "media"), o.optString("format", ""), o.optString("quality", "").ifBlank { null }, if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null)) } } }
     private fun parseJob(o: JSONObject) = Job(o.optString("jobId"), o.optString("status", "unknown"), if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { null }, o.optString("mediaKind", "").ifBlank { null }, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes"), longOrNull(o, "totalBytes"), longOrNull(o, "speedBytesPerSecond"), longOrNull(o, "etaSeconds"), o.optString("error", "").ifBlank { null })
+    private fun numberOrNull(o: JSONObject, key: String): Double? = if (o.has(key) && !o.isNull(key)) o.optDouble(key) else null
     private fun longOrNull(o: JSONObject, key: String): Long? = if (o.has(key) && !o.isNull(key)) o.optLong(key) else null
     private fun jsonStringList(a: JSONArray?): List<String> = if (a == null) emptyList() else buildList { for (i in 0 until a.length()) add(a.optString(i)) }
     private fun enc(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
