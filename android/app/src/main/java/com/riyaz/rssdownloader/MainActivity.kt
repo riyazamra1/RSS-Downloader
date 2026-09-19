@@ -35,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var currentTab = TabOrder.SOCIAL
     private var lightMode = false
     private var tabOrder = TabOrder.defaults.toMutableList()
+    private var drawerOpen = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
