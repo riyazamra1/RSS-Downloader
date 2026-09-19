@@ -432,7 +432,7 @@ class MainActivity : AppCompatActivity() {
         val drawer=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(18),dp(14),dp(14));background=rounded(surface(),28);elevation=dp(18).toFloat();setOnClickListener{}}
         drawer.addView(panel().apply{gravity=Gravity.CENTER_HORIZONTAL;setPadding(dp(14),dp(18),dp(14),dp(16));addView(logoView(78),LinearLayout.LayoutParams(dp(78),dp(78)));addView(text("WELCOME BACK",10,accent(),true).apply{setPadding(0,dp(10),0,dp(0))});addView(text(prefs.getString("name","USER").orEmpty().ifBlank{"USER"},18,textColor(),true));prefs.getString("email","").orEmpty().takeIf{it.isNotBlank()}?.let{addView(text(it,10,muted(),false))}})
         drawer.addView(text("MAIN",10,muted(),true).apply{setPadding(dp(8),dp(18),dp(8),dp(6))})
-        drawer.addView(menuItem("⌂","Home",currentTab==TabOrder.SOCIAL){closeMenu(overlay);currentTab=TabOrder.SOCIAL;showHome()})
+        drawer.addView(menuItem("⌂","Home",false){closeMenu(overlay);showHome()})
         drawer.addView(menuItem("↗","Social Downloader",currentTab==TabOrder.SOCIAL){closeMenu(overlay);currentTab=TabOrder.SOCIAL;showHome()})
         drawer.addView(menuItem("◉","Tamil Movies",currentTab==TabOrder.TAMIL){closeMenu(overlay);currentTab=TabOrder.TAMIL;showHome()})
         drawer.addView(menuItem("▣","Tamil Dubbed Movies",currentTab==TabOrder.DUBBED){closeMenu(overlay);currentTab=TabOrder.DUBBED;showHome()})
