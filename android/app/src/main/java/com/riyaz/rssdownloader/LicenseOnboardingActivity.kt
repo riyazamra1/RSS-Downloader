@@ -127,7 +127,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 if(code !in 200..299) {
                     val serverError=runCatching{JSONObject(txt).optString("error").ifBlank{JSONObject(txt).optString("message")}}.getOrNull().orEmpty()
                     val message=when(code) {
-                        404 -> if(serverError.isNotBlank()) serverError else "RSS Core registration service was not found."
+                        404 -> if(serverError.isNotBlank()) serverError else "RSS Core endpoint not deployed. Check RSS Core deployment."
                         408 -> "RSS Core registration timed out."
                         429 -> "Too many registration attempts. Please try again shortly."
                         else -> serverError.ifBlank{"Registration failed (HTTP $code)."}
