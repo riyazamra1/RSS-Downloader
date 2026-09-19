@@ -29,7 +29,11 @@ class DownloadKeepAliveService : Service() {
     @Volatile private var stopping = false
     private val api by lazy {
         // The host is application-controlled. Never read legacy user-editable host/token preferences.
-        NativeHostApi(BuildConfig.RSS_HOST_BASE_URL, BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null })
+        NativeHostApi(
+            BuildConfig.RSS_HOST_BASE_URL,
+            BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null },
+            getSharedPreferences("rss-downloader-license", MODE_PRIVATE).getString("app_key", null)
+        )
     }
 
     override fun onCreate() {
