@@ -442,60 +442,45 @@ class MainActivity : AppCompatActivity() {
     private fun showSettings() {
         content.removeAllViews()
         val scroll = ScrollView(this)
-        val box = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(18),dp(18),dp(28)) }
-        box.addView(panel().apply {
-            gravity=Gravity.CENTER_HORIZONTAL; setPadding(dp(18),dp(20),dp(18),dp(20))
-            addView(logoView(64),LinearLayout.LayoutParams(dp(64),dp(64)))
-            addView(text("RSS DOWNLOADER",20,textColor(),true).apply{setPadding(0,dp(8),0,0)})
-            addView(text("SETTINGS",11,muted(),true).apply{setPadding(0,dp(3),0,0)})
-        })
-        box.addView(text("GENERAL",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
-        box.addView(settingCard("☀","Appearance","Light / dark interface • saved automatically",lightMode){lightMode=it;prefs.edit().putBoolean("light",it).apply();recreate()})
-        box.addView(settingCard("↗","Auto-paste copied URL","Detect and analyze a copied HTTP(S) URL",prefs.getBoolean("clipboard",true)){prefs.edit().putBoolean("clipboard",it).apply()})
-        box.addView(text("TAB ORDER",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
-        tabOrder.forEachIndexed{index,id->
-            val row=panel().apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(8),dp(8),dp(8))}
-            row.addView(text(tabShortLabel(id),13,textColor(),true),LinearLayout.LayoutParams(dp(54),dp(48)))
-            row.addView(text(tabLabel(id),14,textColor(),true),LinearLayout.LayoutParams(0,-2,1f))
-            row.addView(secondaryButton("↑"){moveTab(index,-1)},LinearLayout.LayoutParams(dp(48),dp(44)).apply{setMargins(dp(4),0,dp(4),0)})
-            row.addView(secondaryButton("↓"){moveTab(index,1)},LinearLayout.LayoutParams(dp(48),dp(44)))
-            box.addView(row,LinearLayout.LayoutParams(-1,dp(64)).apply{setMargins(0,dp(4),0,dp(4))})
-        }
-        box.addView(secondaryButton("Reset tab order"){tabOrder=TabOrder.defaults.toMutableList();prefs.edit().remove("tabOrder").apply();currentTab=TabOrder.SOCIAL;showSettings()},LinearLayout.LayoutParams(-1,dp(48)))
-        box.addView(text("RSS CORE",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
-        box.addView(panel().apply{addView(text("RSS Core Host",14,textColor(),true));addView(text(BuildConfig.RSS_HOST_BASE_URL,12,muted(),false).apply{setPadding(0,dp(4),0,0)});addView(text("Build-controlled host. Changing it requires a new build.",10,muted(),false).apply{setPadding(0,dp(4),0,0)})})
-        box.addView(text("PRIVACY & ACCESS",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
-        box.addView(panel().apply{addView(text("Internet • Storage / media • Notifications",13,textColor(),true));addView(text("Required Android permissions are declared in the manifest.",10,muted(),false).apply{setPadding(0,dp(5),0,0)})})
-        box.addView(text("RAZEEN SECURE SOLUTION",11,muted(),true).apply{setPadding(dp(4),dp(20),dp(4),dp(6))})
-        box.addView(panel().apply{gravity=Gravity.CENTER_HORIZONTAL;setPadding(dp(16),dp(18),dp(16),dp(18));addView(logoView(58),LinearLayout.LayoutParams(dp(58),dp(58)));addView(text("RAZEEN SECURE SOLUTION",15,textColor(),true).apply{setPadding(0,dp(8),0,0)});addView(text("Mobile & PC Software • CCTV • Networking",10,muted(),false).apply{setPadding(0,dp(4),0,0)});addView(text("077 115 5504  •  070 155 5504",11,accent(),true).apply{setPadding(0,dp(7),0,0)});addView(text("rsscctvsolution@gmail.com",11,accent(),false).apply{setPadding(0,dp(3),0,0)});addView(text("www.rsscctvsolution.eu.cc",11,accent(),false).apply{setPadding(0,dp(3),0,0)})})
-        scroll.addView(box);content.addView(scroll)
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(28)) }
+        box.addView(panel().apply { gravity = Gravity.CENTER_HORIZONTAL; addView(logoView(64), LinearLayout.LayoutParams(dp(64), dp(64))); addView(text("RSS DOWNLOADER", 20, textColor(), true)); addView(text("SETTINGS", 11, muted(), true)) })
+        box.addView(settingsSection("GENERAL"))
+        box.addView(settingCard("☀", "Appearance", "Light / dark interface", lightMode) { lightMode = it; prefs.edit().putBoolean("light", it).apply(); recreate() })
+        box.addView(settingCard("↗", "Auto-paste copied URL", "Detect copied HTTP(S) URLs", prefs.getBoolean("clipboard", true)) { prefs.edit().putBoolean("clipboard", it).apply() })
+        box.addView(settingsSection("SECURITY"))
+        box.addView(settingCard("🔒", "App Lock", "Require biometric authentication", prefs.getBoolean("appLock", false)) { v -> prefs.edit().putBoolean("appLock", v).apply(); authenticatedThisSession = !v; if (v) authenticateWithBiometric(); showSettings() })
+        box.addView(settingCard("◉", "Biometric Unlock", "Fingerprint / face / supported biometric", prefs.getBoolean("biometric", true)) { v -> prefs.edit().putBoolean("biometric", v).apply(); if (v && prefs.getBoolean("appLock", false)) authenticateWithBiometric() })
+        box.addView(settingsSection("DOWNLOADS"))
+        val location = prefs.getString("saveLocationUri", null)
+        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location: Not selected" else "Default Save Location: Custom folder", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
+        box.addView(settingCard("↗", "Ask where to save", "Choose destination for each download", prefs.getBoolean("askSaveLocation", false)) { prefs.edit().putBoolean("askSaveLocation", it).apply() })
+        box.addView(settingCard("Wi", "Wi-Fi only", "Restrict downloads to Wi-Fi", prefs.getBoolean("wifiOnly", false)) { prefs.edit().putBoolean("wifiOnly", it).apply() })
+        box.addView(settingsSection("NOTIFICATIONS"))
+        box.addView(settingCard("◔", "Download Progress", "Only during an active download", prefs.getBoolean("notifyProgress", true)) { prefs.edit().putBoolean("notifyProgress", it).apply() })
+        box.addView(settingCard("✓", "Download Completed", "Only after a real download completes", prefs.getBoolean("notifyCompleted", true)) { prefs.edit().putBoolean("notifyCompleted", it).apply() })
+        box.addView(settingCard("!", "Download Failed", "Only after an actual download failure", prefs.getBoolean("notifyFailed", true)) { prefs.edit().putBoolean("notifyFailed", it).apply() })
+        box.addView(settingCard("•", "Background Activity", "Only during genuine background work", prefs.getBoolean("notifyBackground", true)) { prefs.edit().putBoolean("notifyBackground", it).apply() })
+        box.addView(text("No activity = no notification. No fake starting-download notification.", 10, muted(), false).apply { setPadding(dp(4), dp(8), dp(4), 0) })
+        box.addView(settingsSection("RSS CORE"))
+        box.addView(panel().apply { addView(text("RSS Core Host", 14, textColor(), true)); addView(text(BuildConfig.RSS_HOST_BASE_URL, 12, muted(), false)); addView(text("Build-controlled host.", 10, muted(), false)) })
+        box.addView(settingsSection("RAZEEN SECURE SOLUTION"))
+        box.addView(panel().apply { gravity = Gravity.CENTER_HORIZONTAL; addView(logoView(58), LinearLayout.LayoutParams(dp(58), dp(58))); addView(text("RAZEEN SECURE SOLUTION", 15, textColor(), true)); addView(text("Mobile & PC Software • CCTV • Networking", 10, muted(), false)); addView(text("077 115 5504  •  070 155 5504", 11, accent(), true)); addView(text("rsscctvsolution@gmail.com", 11, accent(), false)); addView(text("www.rsscctvsolution.eu.cc", 11, accent(), false)) })
+        scroll.addView(box); content.addView(scroll)
     }
 
-    private fun settingCard(icon:String,title:String,subtitle:String,checked:Boolean,onChanged:(Boolean)->Unit):View=panel().apply{
-        orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(14),dp(10),dp(10),dp(10))
-        addView(TextView(this@MainActivity).apply{text=icon;textSize=18f;gravity=Gravity.CENTER;setTextColor(accent());background=rounded(surface2(),13)},LinearLayout.LayoutParams(dp(42),dp(42)))
-        addView(LinearLayout(this@MainActivity).apply{orientation=LinearLayout.VERTICAL;addView(text(title,14,textColor(),true));addView(text(subtitle,10,muted(),false).apply{setPadding(0,dp(3),0,0)})},LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(dp(12),0,dp(6),0)})
-        addView(Switch(this@MainActivity).apply{isChecked=checked;setOnCheckedChangeListener{_,v->onChanged(v)}})
-    }
+    private fun settingsSection(title: String): View = text(title, 11, muted(), true).apply { setPadding(dp(4), dp(20), dp(4), dp(6)) }
 
+    private fun settingCard(icon: String, title: String, subtitle: String, checked: Boolean, onChanged: (Boolean) -> Unit): View = panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text(icon, 18, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; addView(text(title, 14, textColor(), true)); addView(text(subtitle, 10, muted(), false)) }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(6), 0) }); addView(Switch(this@MainActivity).apply { isChecked = checked; setOnCheckedChangeListener { _, v -> onChanged(v) } }) }
 
-    private fun moveTab(index: Int, delta: Int) {
-        val target = index + delta
-        if (target !in tabOrder.indices) return
-        val moved = tabOrder.removeAt(index)
-        tabOrder.add(target, moved)
-        prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply()
-        currentTab = moved
-        showSettings()
-    }
+    private fun chooseSaveLocation() { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION), saveLocationRequestCode) }
 
-    private fun settingRow(title: String, subtitle: String, checked: Boolean, onChanged: (Boolean) -> Unit): View = LinearLayout(this).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(18), dp(16), dp(10), dp(16))
-        addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; addView(text(title, 15, textColor(), true)); addView(text(subtitle, 11, muted(), false)) }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(Switch(this@MainActivity).apply { isChecked = checked; setOnCheckedChangeListener { _, value -> onChanged(value) } })
-    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) { super.onActivityResult(requestCode, resultCode, data); if (requestCode == saveLocationRequestCode && resultCode == RESULT_OK) data?.data?.let { uri -> runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }; prefs.edit().putString("saveLocationUri", uri.toString()).apply(); showSettings() } }
 
+    private fun biometricAvailable(): Boolean = BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+
+    private fun authenticateWithBiometric() { if (!prefs.getBoolean("appLock", false) || !prefs.getBoolean("biometric", true) || biometricPromptActive) return; if (!biometricAvailable()) { toast("Biometric unlock is not available."); return }; biometricPromptActive = true; val prompt = BiometricPrompt(this, androidx.core.content.ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() { override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { biometricPromptActive = false; authenticatedThisSession = true }; override fun onAuthenticationError(errorCode: Int, errString: CharSequence) { biometricPromptActive = false } }); prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("Unlock RSS Downloader").setSubtitle("Authenticate to continue").setNegativeButtonText("Cancel").build()) }
+
+    private fun hasNotificationPermission(): Boolean = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     private fun readClipboardUrl(autoAnalyze: Boolean) {
         if (!prefs.getBoolean("clipboard", true) || !::urlInput.isInitialized) return
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
