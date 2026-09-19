@@ -5,6 +5,7 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -14,6 +15,8 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -38,7 +41,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mediaPanel: LinearLayout
     private var currentTab = TabOrder.SOCIAL
     private var lightMode = false
-    private var tabOrder = TabOrder.defaults.toMutableList()
+    private var authenticatedThisSession = false
+    private var biometricPromptActive = false
+    private val saveLocationRequestCode = 4201
     private var drawerOpen = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +51,6 @@ class MainActivity : AppCompatActivity() {
         // Remove legacy user-entered host values so an old accidental change can never redirect the app.
         prefs.edit().remove("hostUrl").remove("hostToken").apply()
         lightMode = prefs.getBoolean("light", false)
-        tabOrder = TabOrder.load(prefs.getString("tabOrder", null))
         applyTheme()
         buildApp()
         requestRuntimePermissions()
@@ -56,7 +60,6 @@ class MainActivity : AppCompatActivity() {
     private fun requestRuntimePermissions() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.POST_NOTIFICATIONS
             if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.READ_MEDIA_IMAGES
             if (checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.READ_MEDIA_VIDEO
         } else if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -67,6 +70,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (prefs.getBoolean("appLock", false) && !authenticatedThisSession) authenticateWithBiometric()
         if (::urlInput.isInitialized) readClipboardUrl(true)
     }
 
@@ -114,7 +118,7 @@ class MainActivity : AppCompatActivity() {
         setPadding(dp(8), 0, dp(8), 0)
         setBackgroundColor(surface())
         elevation = dp(8).toFloat()
-        tabOrder.forEach { id ->
+        TabOrder.defaults.forEach { id ->
             val selected = id == currentTab
             val item = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -122,7 +126,6 @@ class MainActivity : AppCompatActivity() {
                 setPadding(dp(4), dp(6), dp(4), dp(4))
                 background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
                 setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
-                setOnLongClickListener { showTabOrderDialog(); true }
             }
             val label = text(tabShortLabel(id), 12, if (selected) accent() else muted(), selected)
             item.addView(label)
@@ -131,19 +134,6 @@ class MainActivity : AppCompatActivity() {
             addView(item, LinearLayout.LayoutParams(0, dp(64), 1f))
         }
         layoutParams = LinearLayout.LayoutParams(-1, dp(64))
-    }
-
-    private fun showTabOrderDialog() {
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(8)) }
-        tabOrder.forEachIndexed { index, id ->
-            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
-            row.addView(text("${index + 1}. ${tabLabel(id)}", 15, textColor(), true), LinearLayout.LayoutParams(0, dp(48), 1f))
-            row.addView(iconButton(android.R.drawable.arrow_up_float, 44, "Move up") { if (index > 0) { val x = tabOrder.removeAt(index); tabOrder.add(index - 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
-            row.addView(iconButton(android.R.drawable.arrow_down_float, 44, "Move down") { if (index < tabOrder.lastIndex) { val x = tabOrder.removeAt(index); tabOrder.add(index + 1, x); prefs.edit().putString("tabOrder", TabOrder.save(tabOrder)).apply(); recreate() } }, LinearLayout.LayoutParams(dp(48), dp(44)))
-            box.addView(row)
-        }
-        box.addView(secondaryButton("Reset default order") { prefs.edit().remove("tabOrder").apply(); recreate() }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(10) })
-        android.app.AlertDialog.Builder(this).setTitle("Rearrange tabs").setView(box).setNegativeButton("Close", null).show()
     }
 
     private fun showHome() {
@@ -379,8 +369,7 @@ class MainActivity : AppCompatActivity() {
         if (!api.configured()) { toast("RSS Core is unavailable."); return }
         api.createDownload(requestId, optionId) { result -> runOnUiThread {
             result.onSuccess {
-                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4102)
-                else startDownloadKeepAlive()
+                if (hasNotificationPermission()) startDownloadKeepAlive()
                 showDownloads()
             }.onFailure { toast(it.message ?: "Download failed.") }
         }}
@@ -388,7 +377,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 4102 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) startDownloadKeepAlive()
     }
 
     private fun showDownloads() {
