@@ -21,6 +21,12 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 class LicenseOnboardingActivity : AppCompatActivity() {
+    companion object {
+        // TEMPORARY TEST MODE: bypass RSS Core registration until the Core endpoint is fixed.
+        // Set to false to restore real registration.
+        private const val TEMP_SKIP_REGISTRATION = true
+    }
+
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var root: FrameLayout
@@ -34,6 +40,20 @@ class LicenseOnboardingActivity : AppCompatActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        if (TEMP_SKIP_REGISTRATION) {
+            if (!prefs.getBoolean("registered", false)) {
+                prefs.edit()
+                    .putBoolean("registered", true)
+                    .putBoolean("onboarding_complete", true)
+                    .putString("display_name", "Test User")
+                    .putString("email", "")
+                    .putString("plan", "free")
+                    .putString("license_status", "temporary-test")
+                    .apply()
+            }
+            openApp()
+            return
+        }
         if (prefs.getBoolean("registered", false)) {
             if (prefs.getBoolean("onboarding_complete", false)) openApp() else showOnboarding()
             return
