@@ -49,7 +49,6 @@ class DownloadKeepAliveService : Service() {
             return START_NOT_STICKY
         }
         stopping = false
-        startForeground(NOTIFICATION_ID, buildNotification("Starting download…", 0))
         pollDownloads()
         return START_NOT_STICKY
     }
