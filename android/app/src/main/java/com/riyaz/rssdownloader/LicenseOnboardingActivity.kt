@@ -137,7 +137,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 JSONObject(txt)
             }
             runOnUiThread {
-                result.onSuccess { r -> prefs.edit().putBoolean("registered",true).putString("customer_id",r.optString("customer_id")).putString("app_key",r.optString("app_key")).putString("display_name",n).putString("email",e).apply(); showOnboarding() }
+                result.onSuccess { r -> prefs.edit().putBoolean("registered",true).putString("customer_id",r.optString("customer_id")).putString("app_key",r.optString("app_key")).putString("display_name",n).putString("email",e).putString("plan",r.optJSONObject("license")?.optString("plan").orEmpty()).putString("license_status",r.optJSONObject("license")?.optString("status").orEmpty()).apply(); showOnboarding() }
                     .onFailure {
                         status.text=it.message ?: "Registration failed. Please try again."
                         name.isEnabled=true; email.isEnabled=true
