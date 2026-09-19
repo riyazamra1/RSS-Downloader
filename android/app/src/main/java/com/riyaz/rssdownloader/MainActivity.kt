@@ -74,6 +74,11 @@ class MainActivity : AppCompatActivity() {
         if (::urlInput.isInitialized) readClipboardUrl(true)
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) authenticatedThisSession = false
+    }
+
     override fun onBackPressed() {
         if (drawerOpen) {
             root.findViewWithTag<View>("rss_drawer_overlay")?.let { closeMenu(it) }
