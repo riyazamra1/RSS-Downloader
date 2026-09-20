@@ -1,6 +1,8 @@
 package com.riyaz.rssdownloader
 
 import android.animation.ValueAnimator
+import android.animation.ObjectAnimator
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -36,6 +38,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private lateinit var email: EditText
     private var page = 0
     private var animator: ValueAnimator? = null
+    private var featureAnimator: ObjectAnimator? = null
     private lateinit var registerButton: TextView
 
     override fun onCreate(state: Bundle?) {
@@ -61,7 +64,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         showRegistration()
     }
 
-    override fun onDestroy() { animator?.cancel(); executor.shutdownNow(); super.onDestroy() }
+    override fun onDestroy() { animator?.cancel(); featureAnimator?.cancel(); executor.shutdownNow(); super.onDestroy() }
 
     private fun background() {
         root = FrameLayout(this)
@@ -180,6 +183,10 @@ class LicenseOnboardingActivity : AppCompatActivity() {
 
     private fun showPage() {
         card=glass(); card.addView(logo(),LinearLayout.LayoutParams(-1,72.dp()))
+        val featureIcon = TextView(this).apply { text = if (page == 0) "✓" else arrayOf("↗","🎬","▣","↓")[page-1]; textSize = 34f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = GradientDrawable().apply { setColor(Color.argb(75,91,108,240)); cornerRadius = 24.dp().toFloat() } }
+        card.addView(featureIcon, LinearLayout.LayoutParams(76.dp(),76.dp()).apply { gravity = Gravity.CENTER; bottomMargin = 12.dp() })
+        featureAnimator?.cancel()
+        featureAnimator = ObjectAnimator.ofFloat(featureIcon, "translationY", -8f, 8f).apply { duration = 1800; repeatCount = ObjectAnimator.INFINITE; repeatMode = ObjectAnimator.REVERSE; interpolator = AccelerateDecelerateInterpolator(); start() }
         val customer=prefs.getString("display_name","Customer") ?: "Customer"
         if(page==0) {
             card.addView(t("Congratulations 👏🎉",27,true))
@@ -194,6 +201,10 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         val b=button(if(page<4)"Next  →" else "Get Started")
         card.addView(b,LinearLayout.LayoutParams(-1,52.dp()).apply{topMargin=14.dp()})
         b.setOnClickListener{if(page<4){page++;showPage()}else{prefs.edit().putBoolean("onboarding_complete",true).apply();openApp()}}
+        if(page>0) {
+            val skip=TextView(this).apply{text="Skip Now";textSize=13f;gravity=Gravity.CENTER;setTextColor(Color.rgb(190,198,220));setPadding(8.dp(),12.dp(),8.dp(),4.dp());isClickable=true;setOnClickListener{prefs.edit().putBoolean("onboarding_complete",true).apply();openApp()}}
+            card.addView(skip,LinearLayout.LayoutParams(-1,42.dp()).apply{topMargin=4.dp()})
+        }
         attach()
     }
 
