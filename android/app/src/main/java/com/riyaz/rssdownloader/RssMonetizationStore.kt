@@ -15,7 +15,7 @@ class RssMonetizationStore(context: Context) {
         }
     }
 
-    fun isPremium(): Boolean = prefs.getBoolean("premium", false)
+    fun isPremium(): Boolean = prefs.getBoolean("premium", false) || prefs.getBoolean("serverPremium", false)
 
     fun freeDownloadsRemaining(): Int {
         resetIfNeeded()
