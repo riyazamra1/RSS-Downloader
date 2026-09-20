@@ -58,6 +58,17 @@ class MainActivity : AppCompatActivity() {
         buildApp()
         requestRuntimePermissions()
         readClipboardUrl(true)
+        syncPremiumEntitlement()
+    }
+
+    private fun syncPremiumEntitlement() {
+        val email = getSharedPreferences("rss-downloader-license", MODE_PRIVATE).getString("email", "").orEmpty()
+        api.checkPremium(email) { result -> runOnUiThread {
+            result.onSuccess { premium ->
+                monetization.setServerPremium(premium)
+                if (premium) toast("RSS Core Premium access is active.")
+            }
+        }}
     }
 
     private fun requestRuntimePermissions() {
