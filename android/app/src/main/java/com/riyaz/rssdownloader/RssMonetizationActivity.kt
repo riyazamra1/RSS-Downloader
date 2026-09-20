@@ -29,7 +29,7 @@ class RssMonetizationActivity : Activity() {
         status = TextView(this).apply { textSize = 15f; gravity = Gravity.CENTER; setPadding(0, 24, 0, 24) }
         root.addView(status)
         root.addView(TextView(this).apply {
-            text = "▶  Watch ad • Get +$REWARD downloads".replace("$REWARD", RssMonetizationConfig.REWARDED_BONUS_DOWNLOADS.toString())
+            text = "▶  Watch ad • Get +" + RssMonetizationConfig.REWARDED_BONUS_DOWNLOADS + " downloads"
             textSize = 16f; gravity = Gravity.CENTER; setPadding(28, 22, 28, 22)
             setOnClickListener { showRewardedAd() }
         })
@@ -44,7 +44,7 @@ class RssMonetizationActivity : Activity() {
 
     private fun updateStatus() {
         status.text = if (store.isPremium()) "Premium active • Unlimited downloads"
-        else "Free today: ${store.freeDownloadsRemaining()} • Bonus credits: ${store.bonusCredits()}"
+        else "Free today: " + store.freeDownloadsRemaining() + " • Bonus credits: " + store.bonusCredits()
     }
 
     private fun loadRewardedAd() {
