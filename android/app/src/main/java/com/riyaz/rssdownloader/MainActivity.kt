@@ -457,6 +457,7 @@ class MainActivity : AppCompatActivity() {
         drawer.addView(text("SUPPORT",10,muted(),true).apply{setPadding(dp(8),dp(16),dp(8),dp(6))})
         drawer.addView(menuItem("⇩","Downloads",false){closeMenu(overlay);showDownloads()})
         drawer.addView(menuItem("Rewards","Earnings & Rewards",false){closeMenu(overlay);startActivity(Intent(this,RssMonetizationActivity::class.java))})
+        drawer.addView(menuItem("★","RSS Premium",false){closeMenu(overlay);showPremium()})
         drawer.addView(menuItem("⚙","Settings",false){closeMenu(overlay);showSettings()})
         drawer.addView(Space(this).apply{layoutParams=LinearLayout.LayoutParams(1,0,1f)})
         drawer.addView(panel().apply{setPadding(dp(12),dp(12),dp(12),dp(12));addView(text("RAZEEN SECURE SOLUTION",13,textColor(),true));addView(text("Mobile & PC Software • CCTV • Networking",9,muted(),false).apply{setPadding(0,dp(3),0,0)});addView(text("www.rsscctvsolution.eu.cc",10,accent(),false).apply{setPadding(0,dp(5),0,0)})})
@@ -469,6 +470,66 @@ class MainActivity : AppCompatActivity() {
         if(selected)addView(View(this@MainActivity).apply{setBackgroundColor(accent())},LinearLayout.LayoutParams(dp(6),dp(6)))
     }
     private fun closeMenu(overlay:View){drawerOpen=false;root.removeView(overlay)}
+
+    private fun showPremium() {
+        content.removeAllViews()
+        val scroll = ScrollView(this)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(28))
+        }
+        box.addView(secondaryButton("← Back") { showHome() }, LinearLayout.LayoutParams(-1, dp(46)))
+        box.addView(panel().apply {
+            setPadding(dp(20), dp(22), dp(20), dp(22))
+            addView(text("RSS PREMIUM", 12, accent(), true))
+            addView(text("Unlock Premium for 1 year", 25, textColor(), true).apply { setPadding(0, dp(8), 0, 0) })
+            addView(text("Premium is attached to your RSS Core account and remains available across supported RSS apps and devices.", 13, muted(), false).apply { setPadding(0, dp(8), 0, 0) })
+            val price = text("Loading price…", 18, accent(), true).apply { setPadding(0, dp(16), 0, 0) }
+            addView(price)
+            val action = primaryButton(if (monetization.isPremium()) "Premium Active" else "Upgrade to Premium")
+            addView(action, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(16) })
+            if (monetization.isPremium()) {
+                action.isEnabled = false
+                addView(text("Your RSS Core Premium entitlement is active.", 12, muted(), false).apply { setPadding(0, dp(10), 0, 0) })
+            } else {
+                action.setOnClickListener {
+                    val email = getSharedPreferences("rss-downloader-license", MODE_PRIVATE).getString("email", "").orEmpty()
+                    action.isEnabled = false
+                    action.text = "Creating secure checkout…"
+                    api.createPremiumCheckout(email, "https://rsscore.cv/payment/success", "https://rsscore.cv/payment/cancel") { result ->
+                        runOnUiThread {
+                            result.onSuccess { checkout ->
+                                action.text = "Continue in browser"
+                                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(checkout.checkoutUrl)))
+                                toast("Payment is pending until RSS Core receives provider confirmation.")
+                            }.onFailure {
+                                action.isEnabled = true
+                                action.text = "Upgrade to Premium"
+                                toast(it.message ?: "Unable to create payment checkout.")
+                            }
+                        }
+                    }
+                }
+            }
+            api.premiumPlan { result ->
+                runOnUiThread {
+                    result.onSuccess { root ->
+                        val plan = root.optJSONArray("plans")?.optJSONObject(0)
+                        val amount = plan?.optInt("price_lkr", 0) ?: 0
+                        price.text = if (amount > 0) "LKR $amount • 365 days" else "Price is being configured"
+                    }.onFailure { price.text = "Price unavailable" }
+                }
+            }
+        })
+        box.addView(panel().apply {
+            setPadding(dp(20), dp(18), dp(20), dp(18))
+            addView(text("PAYMENT STATUS", 11, muted(), true))
+            addView(text("After payment, return to RSS Downloader. The app will refresh the entitlement from RSS Core; the browser return page itself never grants Premium.", 12, muted(), false).apply { setPadding(0, dp(8), 0, 0) })
+            addView(secondaryButton("Refresh Premium Status") { syncPremiumEntitlement(); toast("Refreshing RSS Core entitlement…") }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(12) })
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        scroll.addView(box)
+        content.addView(scroll)
+    }
 
     private fun showSettings() {
         content.removeAllViews()
