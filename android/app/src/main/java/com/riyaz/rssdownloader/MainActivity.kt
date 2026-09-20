@@ -10,7 +10,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
-import android.os.Bundle
+import android.os.Bundle\nimport android.os.StatFs
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -180,7 +180,7 @@ class MainActivity : AppCompatActivity() {
         box.addView(mediaPanel)
     }
 
-    private fun buildMovie(box: LinearLayout, tab: String) {
+    private fun buildStorageCard(): View {\n        val stat = StatFs(filesDir.absolutePath)\n        val total = stat.totalBytes.coerceAtLeast(0L)\n        val free = stat.availableBytes.coerceAtLeast(0L).coerceAtMost(total)\n        val used = (total - free).coerceAtLeast(0L)\n        val percent = if (total > 0L) ((used.toDouble() / total.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0\n        return panel().apply {\n            setPadding(dp(18), dp(16), dp(18), dp(16))\n            addView(text("DEVICE STORAGE", 10, muted(), true))\n            addView(LinearLayout(this@MainActivity).apply {\n                gravity = Gravity.CENTER_VERTICAL\n                addView(LinearLayout(this@MainActivity).apply {\n                    orientation = LinearLayout.VERTICAL\n                    addView(text(formatBytes(free) + " free", 18, textColor(), true))\n                    addView(text(formatBytes(used) + " used  •  " + formatBytes(total) + " total", 11, muted(), false).apply { setPadding(0, dp(3), 0, 0) })\n                }, LinearLayout.LayoutParams(0, -2, 1f))\n                addView(text(percent.toString() + "%", 13, accent(), true))\n            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })\n            addView(progress(percent))\n        }\n    }\n\n    private fun buildMovie(box: LinearLayout, tab: String) {
         box.addView(text(tabLabel(tab).uppercase(Locale.US), 10, Color.rgb(140, 156, 255), true).apply { setPadding(dp(18), dp(12), 0, dp(5)) })
         box.addView(text("Latest movies", 28, textColor(), true).apply { setPadding(dp(18), 0, 0, dp(12)) })
         val search = EditText(this).apply { hint = "Search movies…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); background = rounded(bg(), 14); setPadding(dp(16), 0, dp(16), 0) }
