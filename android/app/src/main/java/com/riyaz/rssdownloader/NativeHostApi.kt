@@ -43,7 +43,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun checkPremium(email: String, callback: (Result<Boolean>) -> Unit) = executor.execute { callback(runCatching {
         if (email.isBlank() || appKey.isNullOrBlank()) return@runCatching false
-        val url = baseUrl.trimEnd("/") + "/api/v1/entitlements/check?app_key=" + enc(appKey!!) + "&email=" + enc(email.trim())
+        val url = baseUrl.trimEnd('/') + "/api/v1/entitlements/check?app_key=" + enc(appKey!!) + "&email=" + enc(email.trim())
         val result = execute(url, "GET", null)
         if (result.first !in 200..299) throw IllegalStateException("Premium entitlement check failed (${result.first}).")
         JSONObject(result.second).optBoolean("premium", false)
