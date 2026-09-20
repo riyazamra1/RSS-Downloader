@@ -27,6 +27,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader", MODE_PRIVATE) }
+    private val monetization by lazy { RssMonetizationStore(this) }
     // RSS Core is app-controlled. The host is no longer user-editable.
     private val api by lazy { NativeHostApi(
         BuildConfig.RSS_HOST_BASE_URL,
@@ -374,8 +375,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun createDownload(requestId: String, optionId: String) {
         if (!api.configured()) { toast("RSS Core is unavailable."); return }
+        when (DownloadNetworkPolicy.check(this, prefs.getBoolean("wifiOnly", false))) {
+            DownloadNetworkPolicy.Decision.NoConnection -> { toast("No validated internet connection. Connect to Wi-Fi or mobile data."); return }
+            DownloadNetworkPolicy.Decision.WifiRequired -> { toast("Wi-Fi only is enabled. Connect to Wi-Fi before downloading."); return }
+            DownloadNetworkPolicy.Decision.Allowed -> Unit
+        }
+        if (!monetization.canStartDownload()) {
+            startActivity(Intent(this, RssMonetizationActivity::class.java))
+            return
+        }
         api.createDownload(requestId, optionId) { result -> runOnUiThread {
             result.onSuccess {
+                monetization.consumeDownload()
                 if (hasNotificationPermission()) startDownloadKeepAlive()
                 showDownloads()
             }.onFailure { toast(it.message ?: "Download failed.") }
@@ -433,6 +444,7 @@ class MainActivity : AppCompatActivity() {
         drawer.addView(menuItem("▣","Tamil Dubbed Movies",currentTab==TabOrder.DUBBED){closeMenu(overlay);currentTab=TabOrder.DUBBED;showHome()})
         drawer.addView(text("SUPPORT",10,muted(),true).apply{setPadding(dp(8),dp(16),dp(8),dp(6))})
         drawer.addView(menuItem("⇩","Downloads",false){closeMenu(overlay);showDownloads()})
+        drawer.addView(menuItem("Rewards","Earnings & Rewards",false){closeMenu(overlay);startActivity(Intent(this,RssMonetizationActivity::class.java))})
         drawer.addView(menuItem("⚙","Settings",false){closeMenu(overlay);showSettings()})
         drawer.addView(Space(this).apply{layoutParams=LinearLayout.LayoutParams(1,0,1f)})
         drawer.addView(panel().apply{setPadding(dp(12),dp(12),dp(12),dp(12));addView(text("RAZEEN SECURE SOLUTION",13,textColor(),true));addView(text("Mobile & PC Software • CCTV • Networking",9,muted(),false).apply{setPadding(0,dp(3),0,0)});addView(text("www.rsscctvsolution.eu.cc",10,accent(),false).apply{setPadding(0,dp(5),0,0)})})
