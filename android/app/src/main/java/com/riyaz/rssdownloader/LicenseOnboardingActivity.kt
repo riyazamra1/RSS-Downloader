@@ -24,7 +24,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     companion object {
         // TEMPORARY TEST MODE: bypass RSS Core registration until the Core endpoint is fixed.
         // Set to false to restore real registration.
-        private const val TEMP_SKIP_REGISTRATION = true
+        private const val TEMP_SKIP_REGISTRATION = false
     }
 
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
@@ -141,6 +141,8 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/register").openConnection() as HttpURLConnection
                 c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
                 c.setRequestProperty("content-type","application/json")
+                c.setRequestProperty("Accept","application/json")
+                c.setRequestProperty("X-RSS-App-Id","rss-downloader")
                 val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
                 c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
                 val code=c.responseCode; val txt=(if(code in 200..299)c.inputStream else c.errorStream).bufferedReader().use{it.readText()}
