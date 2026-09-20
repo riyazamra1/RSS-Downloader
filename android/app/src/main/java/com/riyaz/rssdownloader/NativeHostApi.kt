@@ -45,9 +45,41 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         if (email.isBlank() || appKey.isNullOrBlank()) return@runCatching false
         val url = baseUrl.trimEnd('/') + "/api/v1/entitlements/check?app_key=" + enc(appKey!!) + "&email=" + enc(email.trim())
         val result = execute(url, "GET", null)
-        if (result.first !in 200..299) throw IllegalStateException("Premium entitlement check failed (${result.first}).")
+        if (result.first !in 200..299) throw IllegalStateException("Premium entitlement check failed (" + result.first + ").")
         JSONObject(result.second).optBoolean("premium", false)
     }) }
+
+    fun createPremiumCheckout(email: String, successUrl: String, cancelUrl: String, callback: (Result<PaymentCheckout>) -> Unit) = executor.execute { callback(runCatching {
+        val key = appKey ?: throw IllegalStateException("RSS Downloader account is not registered.")
+        if (email.isBlank()) throw IllegalStateException("RSS Downloader account email is missing.")
+        val body = JSONObject()
+            .put("email", email.trim())
+            .put("app_key", key)
+            .put("project_key", "rss-downloader")
+            .put("plan_key", "RSS_PREMIUM_1_YEAR")
+            .put("success_url", successUrl)
+            .put("cancel_url", cancelUrl)
+        val json = requestObject("/api/v1/payments/checkout", "POST", body)
+        PaymentCheckout(
+            json.optString("order_id"),
+            json.optString("status", "pending"),
+            json.optInt("amount_lkr", 0),
+            json.optString("currency", "LKR"),
+            json.optString("checkout_url").ifBlank { throw IllegalStateException("Payment checkout URL was not returned.") }
+        )
+    }) }
+
+    data class PaymentCheckout(
+        val orderId: String,
+        val status: String,
+        val amountLkr: Int,
+        val currency: String,
+        val checkoutUrl: String
+    )
+
+    fun paymentOrder(orderId: String, callback: (Result<JSONObject>) -> Unit) = executor.execute {
+        callback(runCatching { requestObject("/api/v1/payments/orders/" + enc(orderId), "GET", null) })
+    }
 
     private fun mediaOptions(array: JSONArray?): List<MediaOption> { if (array == null) return emptyList(); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; val id = o.optString("id").ifBlank { o.optString("mediaOptionId") }; if (id.isBlank()) continue; add(MediaOption(id, o.optString("kind", "media"), o.optString("format", ""), o.optString("quality", "").ifBlank { null }, if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null)) } } }
     private fun parseJob(o: JSONObject) = Job(o.optString("jobId"), o.optString("status", "unknown"), if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { null }, o.optString("mediaKind", "").ifBlank { null }, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes"), longOrNull(o, "totalBytes"), longOrNull(o, "speedBytesPerSecond"), longOrNull(o, "etaSeconds"), o.optString("error", "").ifBlank { null })
