@@ -41,4 +41,10 @@ class RssMonetizationStore(context: Context) {
     fun setPremium(enabled: Boolean) {
         prefs.edit().putBoolean("premium", enabled).apply()
     }
+
+    fun setServerPremium(enabled: Boolean) {
+        prefs.edit().putBoolean("serverPremium", enabled).apply()
+    }
+
+    fun isServerPremium(): Boolean = prefs.getBoolean("serverPremium", false)
 }
