@@ -41,6 +41,14 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     fun listDownloads(callback: (Result<List<Job>>) -> Unit) = executor.execute { callback(runCatching { val a = requestObject("/api/downloader/downloads", "GET", null).optJSONArray("jobs") ?: JSONArray(); buildList { for (i in 0 until a.length()) add(parseJob(a.getJSONObject(i))) } }) }
     fun cancel(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { callback(runCatching { parseJob(requestObject("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) }) }
 
+    fun checkPremium(email: String, callback: (Result<Boolean>) -> Unit) = executor.execute { callback(runCatching {
+        if (email.isBlank() || appKey.isNullOrBlank()) return@runCatching false
+        val url = baseUrl.trimEnd("/") + "/api/v1/entitlements/check?app_key=" + enc(appKey!!) + "&email=" + enc(email.trim())
+        val result = execute(url, "GET", null)
+        if (result.first !in 200..299) throw IllegalStateException("Premium entitlement check failed (${result.first}).")
+        JSONObject(result.second).optBoolean("premium", false)
+    }) }
+
     private fun mediaOptions(array: JSONArray?): List<MediaOption> { if (array == null) return emptyList(); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; val id = o.optString("id").ifBlank { o.optString("mediaOptionId") }; if (id.isBlank()) continue; add(MediaOption(id, o.optString("kind", "media"), o.optString("format", ""), o.optString("quality", "").ifBlank { null }, if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null)) } } }
     private fun parseJob(o: JSONObject) = Job(o.optString("jobId"), o.optString("status", "unknown"), if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { null }, o.optString("mediaKind", "").ifBlank { null }, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes"), longOrNull(o, "totalBytes"), longOrNull(o, "speedBytesPerSecond"), longOrNull(o, "etaSeconds"), o.optString("error", "").ifBlank { null })
     private fun numberOrNull(o: JSONObject, key: String): Double? = if (o.has(key) && !o.isNull(key)) o.optDouble(key) else null
