@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mediaPanel: LinearLayout
     private var currentTab = TabOrder.SOCIAL
     private var lightMode = false
+    private var appearanceMode = "dark"
     private var authenticatedThisSession = false
     private var biometricPromptActive = false
     private val saveLocationRequestCode = 4201
@@ -50,7 +51,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // Remove legacy user-entered host values so an old accidental change can never redirect the app.
         prefs.edit().remove("hostUrl").remove("hostToken").apply()
-        lightMode = prefs.getBoolean("light", false)
+        appearanceMode = prefs.getString("appearance", "dark") ?: "dark"
+        lightMode = appearanceMode == "light" || (appearanceMode == "system" && (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_NO)
         applyTheme()
         buildApp()
         requestRuntimePermissions()
@@ -448,31 +450,61 @@ class MainActivity : AppCompatActivity() {
         content.removeAllViews()
         val scroll = ScrollView(this)
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(28)) }
-        box.addView(panel().apply { gravity = Gravity.CENTER_HORIZONTAL; addView(logoView(64), LinearLayout.LayoutParams(dp(64), dp(64))); addView(text("RSS DOWNLOADER", 20, textColor(), true)); addView(text("SETTINGS", 11, muted(), true)) })
+        box.addView(panel().apply { gravity = Gravity.CENTER_HORIZONTAL; addView(logoView(64), LinearLayout.LayoutParams(dp(64), dp(64))); addView(text("RSS DOWNLOADER", 20, textColor(), true)); addView(text("SETTINGS", 11, muted(), true).apply { setPadding(0, dp(3), 0, 0) }) })
         box.addView(settingsSection("GENERAL"))
-        box.addView(settingCard("☀", "Appearance", "Light / dark interface", lightMode) { lightMode = it; prefs.edit().putBoolean("light", it).apply(); recreate() })
+        box.addView(settingActionCard("◐", "Appearance", appearanceLabel(), appearanceMode) { chooseAppearance() })
         box.addView(settingCard("↗", "Auto-paste copied URL", "Detect copied HTTP(S) URLs", prefs.getBoolean("clipboard", true)) { prefs.edit().putBoolean("clipboard", it).apply() })
+        box.addView(settingCard("⌕", "Auto-analyze pasted URL", "Analyze a newly detected URL automatically", prefs.getBoolean("autoAnalyzeClipboard", true)) { prefs.edit().putBoolean("autoAnalyzeClipboard", it).apply() })
+        box.addView(settingCard("✓", "Confirm before analyzing", "Ask before automatic clipboard analysis", prefs.getBoolean("confirmClipboardAnalyze", false)) { prefs.edit().putBoolean("confirmClipboardAnalyze", it).apply() })
         box.addView(settingsSection("SECURITY"))
-        box.addView(settingCard("🔒", "App Lock", "Require biometric authentication", prefs.getBoolean("appLock", false)) { v -> prefs.edit().putBoolean("appLock", v).apply(); authenticatedThisSession = !v; if (v) authenticateWithBiometric(); showSettings() })
+        box.addView(settingCard("🔒", "App Lock", "Require authentication after leaving the app", prefs.getBoolean("appLock", false)) { v -> prefs.edit().putBoolean("appLock", v).apply(); authenticatedThisSession = !v; if (v) authenticateWithBiometric() })
         box.addView(settingCard("◉", "Biometric Unlock", "Fingerprint / face / supported biometric", prefs.getBoolean("biometric", true)) { v -> prefs.edit().putBoolean("biometric", v).apply(); if (v && prefs.getBoolean("appLock", false)) authenticateWithBiometric() })
+        box.addView(settingActionCard("◷", "Auto-lock timing", lockTimingLabel(), prefs.getString("lockTimeout", "immediate") ?: "immediate") { chooseLockTiming() })
+        box.addView(settingCard("◌", "Lock on background", "Lock when RSS Downloader leaves the foreground", prefs.getBoolean("lockOnBackground", true)) { prefs.edit().putBoolean("lockOnBackground", it).apply() })
         box.addView(settingsSection("DOWNLOADS"))
         val location = prefs.getString("saveLocationUri", null)
-        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location: Not selected" else "Default Save Location: Custom folder", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
+        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location\nNot selected" else "Default Save Location\nCustom folder selected", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
         box.addView(settingCard("↗", "Ask where to save", "Choose destination for each download", prefs.getBoolean("askSaveLocation", false)) { prefs.edit().putBoolean("askSaveLocation", it).apply() })
         box.addView(settingCard("Wi", "Wi-Fi only", "Restrict downloads to Wi-Fi", prefs.getBoolean("wifiOnly", false)) { prefs.edit().putBoolean("wifiOnly", it).apply() })
+        box.addView(settingActionCard("HD", "Preferred video quality", qualityLabel("videoQuality", "Best available"), prefs.getString("videoQuality", "Best available") ?: "Best available") { chooseQuality("videoQuality", arrayOf("Best available", "1080p", "720p", "480p")) })
+        box.addView(settingActionCard("AU", "Preferred audio quality", qualityLabel("audioQuality", "Best available"), prefs.getString("audioQuality", "Best available") ?: "Best available") { chooseQuality("audioQuality", arrayOf("Best available", "320 kbps", "256 kbps", "128 kbps")) })
+        box.addView(settingCard("▶", "Prefer MP4", "Prefer MP4 when an authorized format is available", prefs.getBoolean("preferMp4", true)) { prefs.edit().putBoolean("preferMp4", it).apply() })
+        box.addView(settingCard("CC", "Subtitles", "Include subtitles when supported", prefs.getBoolean("subtitles", false)) { prefs.edit().putBoolean("subtitles", it).apply() })
         box.addView(settingsSection("NOTIFICATIONS"))
         box.addView(settingCard("◔", "Download Progress", "Only during an active download", prefs.getBoolean("notifyProgress", true)) { prefs.edit().putBoolean("notifyProgress", it).apply() })
         box.addView(settingCard("✓", "Download Completed", "Only after a real download completes", prefs.getBoolean("notifyCompleted", true)) { prefs.edit().putBoolean("notifyCompleted", it).apply() })
         box.addView(settingCard("!", "Download Failed", "Only after an actual download failure", prefs.getBoolean("notifyFailed", true)) { prefs.edit().putBoolean("notifyFailed", it).apply() })
         box.addView(settingCard("•", "Background Activity", "Only during genuine background work", prefs.getBoolean("notifyBackground", true)) { prefs.edit().putBoolean("notifyBackground", it).apply() })
         box.addView(text("No activity = no notification. No fake starting-download notification.", 10, muted(), false).apply { setPadding(dp(4), dp(8), dp(4), 0) })
-        box.addView(settingsSection("RSS CORE"))
-        box.addView(panel().apply { addView(text("RSS Core Host", 14, textColor(), true)); addView(text(BuildConfig.RSS_HOST_BASE_URL, 12, muted(), false)); addView(text("Build-controlled host.", 10, muted(), false)) })
+        box.addView(settingsSection("SYNC & DATA"))
+        box.addView(settingCard("⟳", "Auto-sync download history", "Refresh download state when the app returns", prefs.getBoolean("autoSync", true)) { prefs.edit().putBoolean("autoSync", it).apply() })
+        box.addView(settingActionCard("⌫", "Clear cached images", "Remove locally cached poster/image data", "Clear") { toast("Image cache clearing will be connected to the downloader cache.") })
+        box.addView(settingActionCard("≡", "Clear download history", "Remove local history only", "Clear") { confirmAction("Clear download history?", "This removes local history. Active downloads are not cancelled.") { prefs.edit().remove("downloadHistory").apply(); toast("Download history cleared.") } })
+        box.addView(settingsSection("NETWORK"))
+        box.addView(settingActionCard("↻", "Request timeout", prefs.getInt("timeoutSeconds", 30).toString() + " seconds", prefs.getInt("timeoutSeconds", 30).toString()) { chooseTimeout() })
+        box.addView(settingActionCard("↺", "Retry attempts", prefs.getInt("retryAttempts", 2).toString() + " retries", prefs.getInt("retryAttempts", 2).toString()) { chooseRetries() })
+        box.addView(panel().apply { addView(text("RSS Core Host", 14, textColor(), true)); addView(text(BuildConfig.RSS_HOST_BASE_URL, 12, muted(), false).apply { setPadding(0, dp(4), 0, 0) }); addView(text("Build-controlled host. Not user-editable.", 10, muted(), false).apply { setPadding(0, dp(3), 0, 0) }) })
+        box.addView(settingsSection("GENERAL BEHAVIOR"))
+        box.addView(settingCard("☀", "Keep screen awake", "Prevent screen timeout while viewing active download details", prefs.getBoolean("keepScreenAwake", false)) { prefs.edit().putBoolean("keepScreenAwake", it).apply() })
+        box.addView(settingCard("⚠", "Confirm downloads", "Ask before starting an authorized download", prefs.getBoolean("confirmDownload", false)) { prefs.edit().putBoolean("confirmDownload", it).apply() })
+        box.addView(settingsSection("ABOUT"))
+        box.addView(panel().apply { addView(text("RSS Downloader", 18, textColor(), true)); addView(text("Native Android downloader • " + BuildConfig.VERSION_NAME, 11, muted(), false).apply { setPadding(0, dp(4), 0, 0) }); addView(text("Package: " + BuildConfig.APPLICATION_ID, 10, muted(), false).apply { setPadding(0, dp(3), 0, 0) }) })
         box.addView(settingsSection("RAZEEN SECURE SOLUTION"))
         box.addView(panel().apply { gravity = Gravity.CENTER_HORIZONTAL; addView(logoView(58), LinearLayout.LayoutParams(dp(58), dp(58))); addView(text("RAZEEN SECURE SOLUTION", 15, textColor(), true)); addView(text("Mobile & PC Software • CCTV • Networking", 10, muted(), false)); addView(text("077 115 5504  •  070 155 5504", 11, accent(), true)); addView(text("rsscctvsolution@gmail.com", 11, accent(), false)); addView(text("www.rsscctvsolution.eu.cc", 11, accent(), false)) })
         scroll.addView(box); content.addView(scroll)
     }
 
+    private fun appearanceLabel(): String = when (appearanceMode) { "light" -> "Light"; "system" -> "System default"; else -> "Dark" }
+    private fun lockTimingLabel(): String = when (prefs.getString("lockTimeout", "immediate")) { "5m" -> "After 5 minutes"; "15m" -> "After 15 minutes"; "30m" -> "After 30 minutes"; "never" -> "Only when manually locked"; else -> "Immediately on background" }
+    private fun qualityLabel(key: String, fallback: String): String = prefs.getString(key, fallback) ?: fallback
+    private fun settingActionCard(icon: String, title: String, subtitle: String, value: String, onClick: () -> Unit): View = panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text(icon, 18, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; addView(text(title, 14, textColor(), true)); addView(text(subtitle, 10, muted(), false)) }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton(value, onClick)) }
+    private fun chooseAppearance() { val values = arrayOf("Light", "Dark", "System default"); val keys = arrayOf("light", "dark", "system"); val selected = keys.indexOf(appearanceMode).coerceAtLeast(0); AlertDialog.Builder(this).setTitle("Appearance").setSingleChoiceItems(values, selected) { dialog, which -> appearanceMode = keys[which]; prefs.edit().putString("appearance", appearanceMode).putBoolean("light", appearanceMode == "light").apply(); lightMode = appearanceMode == "light" || (appearanceMode == "system" && (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_NO); dialog.dismiss(); recreate() }.setNegativeButton("Cancel", null).show() }
+    private fun chooseLockTiming() { val values = arrayOf("Immediately on background", "After 5 minutes", "After 15 minutes", "After 30 minutes", "Only when manually locked"); val keys = arrayOf("immediate", "5m", "15m", "30m", "never"); val selected = keys.indexOf(prefs.getString("lockTimeout", "immediate")).coerceAtLeast(0); AlertDialog.Builder(this).setTitle("Auto-lock timing").setSingleChoiceItems(values, selected) { dialog, which -> prefs.edit().putString("lockTimeout", keys[which]).apply(); dialog.dismiss(); showSettings() }.setNegativeButton("Cancel", null).show() }
+    private fun chooseQuality(key: String, values: Array<String>) { val current = prefs.getString(key, values[0]) ?: values[0]; val selected = values.indexOf(current).coerceAtLeast(0); AlertDialog.Builder(this).setTitle(if (key == "videoQuality") "Video quality" else "Audio quality").setSingleChoiceItems(values, selected) { dialog, which -> prefs.edit().putString(key, values[which]).apply(); dialog.dismiss(); showSettings() }.setNegativeButton("Cancel", null).show() }
+    private fun chooseTimeout() { val values = arrayOf("15 seconds", "30 seconds", "60 seconds", "120 seconds"); val numbers = intArrayOf(15, 30, 60, 120); val selected = numbers.indexOf(prefs.getInt("timeoutSeconds", 30)).coerceAtLeast(0); AlertDialog.Builder(this).setTitle("Request timeout").setSingleChoiceItems(values, selected) { dialog, which -> prefs.edit().putInt("timeoutSeconds", numbers[which]).apply(); dialog.dismiss(); showSettings() }.setNegativeButton("Cancel", null).show() }
+    private fun chooseRetries() { val values = arrayOf("0 retries", "1 retry", "2 retries", "3 retries", "5 retries"); val numbers = intArrayOf(0, 1, 2, 3, 5); val selected = numbers.indexOf(prefs.getInt("retryAttempts", 2)).coerceAtLeast(0); AlertDialog.Builder(this).setTitle("Retry attempts").setSingleChoiceItems(values, selected) { dialog, which -> prefs.edit().putInt("retryAttempts", numbers[which]).apply(); dialog.dismiss(); showSettings() }.setNegativeButton("Cancel", null).show() }
+
+    private fun confirmAction(title: String, message: String, action: () -> Unit) { AlertDialog.Builder(this).setTitle(title).setMessage(message).setNegativeButton("Cancel", null).setPositiveButton("Clear") { _, _ -> action() }.show() }
     private fun settingsSection(title: String): View = text(title, 11, muted(), true).apply { setPadding(dp(4), dp(20), dp(4), dp(6)) }
 
     private fun settingCard(icon: String, title: String, subtitle: String, checked: Boolean, onChanged: (Boolean) -> Unit): View = panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text(icon, 18, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; addView(text(title, 14, textColor(), true)); addView(text(subtitle, 10, muted(), false)) }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(6), 0) }); addView(Switch(this@MainActivity).apply { isChecked = checked; setOnCheckedChangeListener { _, v -> onChanged(v) } }) }
