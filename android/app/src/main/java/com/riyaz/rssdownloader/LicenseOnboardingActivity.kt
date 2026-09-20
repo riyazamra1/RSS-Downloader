@@ -141,25 +141,43 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         status.text="Registering…"; name.isEnabled=false; email.isEnabled=false
         executor.execute {
             val result=runCatching {
-                val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/register").openConnection() as HttpURLConnection
-                c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
-                c.setRequestProperty("content-type","application/json")
-                c.setRequestProperty("Accept","application/json")
-                c.setRequestProperty("X-RSS-App-Id","rss-downloader")
                 val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
-                c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
-                val code=c.responseCode; val txt=(if(code in 200..299)c.inputStream else c.errorStream).bufferedReader().use{it.readText()}
-                if(code !in 200..299) {
-                    val serverError=runCatching{JSONObject(txt).optString("error").ifBlank{JSONObject(txt).optString("message")}}.getOrNull().orEmpty()
-                    val message=when(code) {
-                        404 -> if(serverError.isNotBlank()) serverError else "RSS Core endpoint not deployed. Check RSS Core deployment."
+                val base=BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')
+                val endpoints=arrayOf("$base/api/v1/license/register","$base/v1/license/register")
+                var lastCode=0
+                var lastText=""
+                var registeredJson: JSONObject?=null
+                for (endpoint in endpoints) {
+                    val c=URL(endpoint).openConnection() as HttpURLConnection
+                    try {
+                        c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
+                        c.setRequestProperty("content-type","application/json")
+                        c.setRequestProperty("Accept","application/json")
+                        c.setRequestProperty("X-RSS-App-Id","rss-downloader")
+                        c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
+                        lastCode=c.responseCode
+                        lastText=(if(lastCode in 200..299)c.inputStream else c.errorStream).bufferedReader().use{it.readText()}
+                        if(lastCode in 200..299) {
+                            registeredJson=JSONObject(lastText)
+                            break
+                        }
+                        if(lastCode != 404) break
+                    } finally {
+                        c.disconnect()
+                    }
+                }
+                if (registeredJson == null) {
+                    val serverError=runCatching{JSONObject(lastText).optString("error").ifBlank{JSONObject(lastText).optString("message")}}.getOrNull().orEmpty()
+                    val message=when(lastCode) {
+                        404 -> if(serverError.isNotBlank()) serverError else "RSS Core registration endpoint returned 404. RSS Core production deployment is missing the registration route."
                         408 -> "RSS Core registration timed out."
                         429 -> "Too many registration attempts. Please try again shortly."
-                        else -> serverError.ifBlank{"Registration failed (HTTP $code)."}
+                        0 -> "Unable to connect to RSS Core at ${BuildConfig.RSS_HOST_BASE_URL}."
+                        else -> serverError.ifBlank{"Registration failed (HTTP $lastCode)."}
                     }
                     error(message)
                 }
-                JSONObject(txt)
+                registeredJson!!
             }
             runOnUiThread {
                 result.onSuccess { r -> prefs.edit().putBoolean("registered",true).putString("customer_id",r.optString("customer_id")).putString("app_key",r.optString("app_key")).putString("display_name",n).putString("email",e).putString("plan",r.optJSONObject("license")?.optString("plan").orEmpty()).putString("license_status",r.optJSONObject("license")?.optString("status").orEmpty()).apply(); showOnboarding() }
