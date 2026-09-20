@@ -49,6 +49,10 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         JSONObject(result.second).optBoolean("premium", false)
     }) }
 
+    fun premiumPlan(callback: (Result<JSONObject>) -> Unit) = executor.execute {
+        callback(runCatching { requestObject("/api/v1/payments/plans", "GET", null) })
+    }
+
     fun createPremiumCheckout(email: String, successUrl: String, cancelUrl: String, callback: (Result<PaymentCheckout>) -> Unit) = executor.execute { callback(runCatching {
         val key = appKey ?: throw IllegalStateException("RSS Downloader account is not registered.")
         if (email.isBlank()) throw IllegalStateException("RSS Downloader account email is missing.")
