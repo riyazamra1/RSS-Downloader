@@ -10,7 +10,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
-import android.os.Bundle\nimport android.os.StatFs
+import android.os.Bundle
+import android.os.StatFs
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -191,7 +192,29 @@ class MainActivity : AppCompatActivity() {
         box.addView(mediaPanel)
     }
 
-    private fun buildStorageCard(): View {\n        val stat = StatFs(filesDir.absolutePath)\n        val total = stat.totalBytes.coerceAtLeast(0L)\n        val free = stat.availableBytes.coerceAtLeast(0L).coerceAtMost(total)\n        val used = (total - free).coerceAtLeast(0L)\n        val percent = if (total > 0L) ((used.toDouble() / total.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0\n        return panel().apply {\n            setPadding(dp(18), dp(16), dp(18), dp(16))\n            addView(text("DEVICE STORAGE", 10, muted(), true))\n            addView(LinearLayout(this@MainActivity).apply {\n                gravity = Gravity.CENTER_VERTICAL\n                addView(LinearLayout(this@MainActivity).apply {\n                    orientation = LinearLayout.VERTICAL\n                    addView(text(formatBytes(free) + " free", 18, textColor(), true))\n                    addView(text(formatBytes(used) + " used  •  " + formatBytes(total) + " total", 11, muted(), false).apply { setPadding(0, dp(3), 0, 0) })\n                }, LinearLayout.LayoutParams(0, -2, 1f))\n                addView(text(percent.toString() + "%", 13, accent(), true))\n            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })\n            addView(progress(percent))\n        }\n    }\n\n    private fun buildMovie(box: LinearLayout, tab: String) {
+    private fun buildStorageCard(): View {
+        val stat = StatFs(filesDir.absolutePath)
+        val total = stat.totalBytes.coerceAtLeast(0L)
+        val free = stat.availableBytes.coerceAtLeast(0L).coerceAtMost(total)
+        val used = (total - free).coerceAtLeast(0L)
+        val percent = if (total > 0L) ((used.toDouble() / total.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0
+        return panel().apply {
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            addView(text("DEVICE STORAGE", 10, muted(), true))
+            addView(LinearLayout(this@MainActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(text(formatBytes(free) + " free", 18, textColor(), true))
+                    addView(text(formatBytes(used) + " used  •  " + formatBytes(total) + " total", 11, muted(), false).apply { setPadding(0, dp(3), 0, 0) })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(text(percent.toString() + "%", 13, accent(), true))
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            addView(progress(percent))
+        }
+    }
+
+    private fun buildMovie(box: LinearLayout, tab: String) {
         box.addView(text(tabLabel(tab).uppercase(Locale.US), 10, Color.rgb(140, 156, 255), true).apply { setPadding(dp(18), dp(12), 0, dp(5)) })
         box.addView(text("Latest movies", 28, textColor(), true).apply { setPadding(dp(18), 0, 0, dp(12)) })
         val search = EditText(this).apply { hint = "Search movies…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); background = rounded(bg(), 14); setPadding(dp(16), 0, dp(16), 0) }
@@ -507,7 +530,7 @@ class MainActivity : AppCompatActivity() {
             addView(text("Premium is attached to your RSS Core account and remains available across supported RSS apps and devices.", 13, muted(), false).apply { setPadding(0, dp(8), 0, 0) })
             val price = text("Loading price…", 18, accent(), true).apply { setPadding(0, dp(16), 0, 0) }
             addView(price)
-            val action = primaryButton(if (monetization.isPremium()) "Premium Active" else "Upgrade to Premium")
+            val action = primaryButton(if (monetization.isPremium()) "Premium Active" else "Upgrade to Premium") {}
             addView(action, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(16) })
             if (monetization.isPremium()) {
                 action.isEnabled = false
@@ -569,7 +592,9 @@ class MainActivity : AppCompatActivity() {
         box.addView(settingCard("◌", "Lock on background", "Lock when RSS Downloader leaves the foreground", prefs.getBoolean("lockOnBackground", true)) { prefs.edit().putBoolean("lockOnBackground", it).apply() })
         box.addView(settingsSection("DOWNLOADS"))
         val location = prefs.getString("saveLocationUri", null)
-        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location\nNot selected" else "Default Save Location\nCustom folder selected", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
+        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location
+Not selected" else "Default Save Location
+Custom folder selected", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
         box.addView(settingCard("↗", "Ask where to save", "Choose destination for each download", prefs.getBoolean("askSaveLocation", false)) { prefs.edit().putBoolean("askSaveLocation", it).apply() })
         box.addView(settingCard("Wi", "Wi-Fi only", "Restrict downloads to Wi-Fi", prefs.getBoolean("wifiOnly", false)) { prefs.edit().putBoolean("wifiOnly", it).apply() })
         box.addView(settingActionCard("HD", "Preferred video quality", qualityLabel("videoQuality", "Best available"), prefs.getString("videoQuality", "Best available") ?: "Best available") { chooseQuality("videoQuality", arrayOf("Best available", "1080p", "720p", "480p")) })
