@@ -27,6 +27,7 @@ class DownloadKeepAliveService : Service() {
 
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var stopping = false
+    private val lastStatuses = mutableMapOf<String, String>()
     private val api by lazy {
         // The host is application-controlled. Never read legacy user-editable host/token preferences.
         NativeHostApi(
@@ -49,6 +50,7 @@ class DownloadKeepAliveService : Service() {
             return START_NOT_STICKY
         }
         stopping = false
+        startForeground(NOTIFICATION_ID, buildNotification("Download active • checking status…", 0))
         pollDownloads()
         return START_NOT_STICKY
     }
@@ -59,6 +61,16 @@ class DownloadKeepAliveService : Service() {
             api.listDownloads { result ->
                 if (stopping) return@listDownloads
                 result.onSuccess { jobs ->
+                    jobs.forEach { job ->
+                        val status = job.status.uppercase(Locale.US)
+                        val previous = lastStatuses.put(job.jobId, status)
+                        if (previous != null && previous != status) {
+                            val prefs = getSharedPreferences("rss-downloader", MODE_PRIVATE)
+                            val title = job.title ?: "RSS Downloader"
+                            if (status in setOf("COMPLETED", "COMPLETE", "SUCCESS", "FINISHED") && prefs.getBoolean("notifyCompleted", true)) notifyTerminal(job.jobId, "Download completed", title, false)
+                            else if (status in setOf("FAILED", "ERROR", "CANCELLED", "CANCELED") && prefs.getBoolean("notifyFailed", true)) notifyTerminal(job.jobId, "Download failed", job.error ?: title, true)
+                        }
+                    }
                     val active = jobs.filter { it.status.uppercase(Locale.US) in ACTIVE_STATUSES }
                     if (active.isEmpty()) {
                         stopping = true
@@ -85,6 +97,21 @@ class DownloadKeepAliveService : Service() {
             try { Thread.sleep(5000) } catch (_: InterruptedException) { return@execute }
             if (!stopping) pollDownloads()
         }
+    }
+
+    private fun notifyTerminal(jobId: String, title: String, message: String, failed: Boolean) {
+        val notificationId = NOTIFICATION_ID + (jobId.hashCode() and 0x0FFF)
+        getSystemService(NotificationManager::class.java).notify(
+            notificationId,
+            NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.rss_downloader_logo)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setAutoCancel(true)
+                .setCategory(if (failed) NotificationCompat.CATEGORY_ERROR else NotificationCompat.CATEGORY_STATUS)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+        )
     }
 
     private fun buildNotification(text: String, progress: Int): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
