@@ -48,6 +48,10 @@ class MainActivity : AppCompatActivity() {
     private var biometricPromptActive = false
     private val saveLocationRequestCode = 4201
     private var drawerOpen = false
+    private val clipboardManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
+    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
+        if (!isFinishing && ::urlInput.isInitialized) runOnUiThread { readClipboardUrl(prefs.getBoolean("autoAnalyze", true)) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +62,7 @@ class MainActivity : AppCompatActivity() {
         applyTheme()
         buildApp()
         requestRuntimePermissions()
-        readClipboardUrl(true)
+        readClipboardUrl(prefs.getBoolean("autoAnalyze", true))
         syncPremiumEntitlement()
     }
 
@@ -80,16 +84,23 @@ class MainActivity : AppCompatActivity() {
         } else if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             permissions += Manifest.permission.READ_EXTERNAL_STORAGE
         }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.POST_NOTIFICATIONS
         if (permissions.isNotEmpty()) requestPermissions(permissions.toTypedArray(), 4102)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        clipboardManager.addPrimaryClipChangedListener(clipboardListener)
     }
 
     override fun onResume() {
         super.onResume()
         if (prefs.getBoolean("appLock", false) && !authenticatedThisSession) authenticateWithBiometric()
-        if (::urlInput.isInitialized) readClipboardUrl(true)
+        if (::urlInput.isInitialized) readClipboardUrl(prefs.getBoolean("autoAnalyze", true))
     }
 
     override fun onStop() {
+        clipboardManager.removePrimaryClipChangedListener(clipboardListener)
         super.onStop()
         if (!isChangingConfigurations) authenticatedThisSession = false
     }
@@ -305,6 +316,16 @@ class MainActivity : AppCompatActivity() {
     private fun analyzeUrl() {
         val url = urlInput.text.toString().trim()
         if (url.isBlank()) { toast("Paste a URL first."); return }
+        if (prefs.getBoolean("confirmAnalyze", false)) {
+            AlertDialog.Builder(this).setTitle("Analyze URL?").setMessage(url)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Analyze") { _, _ -> analyzeUrlNow(url) }.show()
+            return
+        }
+        analyzeUrlNow(url)
+    }
+
+    private fun analyzeUrlNow(url: String) {
         stateText.visibility = View.VISIBLE
         mediaPanel.visibility = View.VISIBLE
         mediaPanel.removeAllViews()
