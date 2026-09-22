@@ -148,23 +148,35 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 var lastText=""
                 var registeredJson: JSONObject?=null
                 for (endpoint in endpoints) {
-                    val c=URL(endpoint).openConnection() as HttpURLConnection
-                    try {
-                        c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
-                        c.setRequestProperty("content-type","application/json")
-                        c.setRequestProperty("Accept","application/json")
-                        c.setRequestProperty("X-RSS-App-Id","rss-downloader")
-                        c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
-                        lastCode=c.responseCode
-                        lastText=(if(lastCode in 200..299)c.inputStream else c.errorStream).bufferedReader().use{it.readText()}
-                        if(lastCode in 200..299) {
-                            registeredJson=JSONObject(lastText)
-                            break
+                    val attempt = runCatching {
+                        val c=URL(endpoint).openConnection() as HttpURLConnection
+                        try {
+                            c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
+                            c.useCaches=false
+                            c.setRequestProperty("Connection","close")
+                            c.setRequestProperty("Accept-Encoding","identity")
+                            c.setRequestProperty("content-type","application/json")
+                            c.setRequestProperty("Accept","application/json")
+                            c.setRequestProperty("X-RSS-App-Id","rss-downloader")
+                            c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
+                            val code=c.responseCode
+                            val stream=if(code in 200..299) c.inputStream else c.errorStream
+                            val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty()
+                            Triple(code,text,null as String?)
+                        } catch (io: java.io.IOException) {
+                            Triple(0,"",io.message ?: "Network connection closed unexpectedly")
+                        } finally {
+                            c.disconnect()
                         }
-                        if(lastCode != 404) break
-                    } finally {
-                        c.disconnect()
+                    }.getOrElse { Triple(0,"",it.message ?: "Network connection failed") }
+
+                    lastCode=attempt.first
+                    lastText=attempt.second
+                    if(lastCode in 200..299) {
+                        registeredJson=JSONObject(lastText)
+                        break
                     }
+                    if(lastCode != 404) break
                 }
                 if (registeredJson == null) {
                     val serverError=runCatching{JSONObject(lastText).optString("error").ifBlank{JSONObject(lastText).optString("message")}}.getOrNull().orEmpty()
@@ -172,7 +184,9 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                         404 -> if(serverError.isNotBlank()) serverError else "RSS Core registration endpoint returned 404. RSS Core production deployment is missing the registration route."
                         408 -> "RSS Core registration timed out."
                         429 -> "Too many registration attempts. Please try again shortly."
-                        0 -> "Unable to connect to RSS Core at ${BuildConfig.RSS_HOST_BASE_URL}."
+                        502 -> serverError.ifBlank{"RSS Core could not send the verification email. Please try again shortly."}
+                        503 -> serverError.ifBlank{"RSS Core email verification service is not configured. Registration cannot be completed until email verification is available."}
+                        0 -> "Connection to RSS Core was interrupted. Please check your internet connection and try again."
                         else -> serverError.ifBlank{"Registration failed (HTTP $lastCode)."}
                     }
                     error(message)
