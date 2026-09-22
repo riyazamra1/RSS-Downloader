@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -78,6 +78,14 @@ jobs:
           test -s "$APK"
           sha256sum "$APK" | tee apk.sha256
           ls -lh "$APK"
+
+      - name: Publish direct APK release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" android/app/build/outputs/apk/debug/app-debug.apk --title "RSS Downloader build ${GITHUB_RUN_NUMBER}" --notes "Automated APK build from ${GITHUB_SHA}" --target "${GITHUB_SHA}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
