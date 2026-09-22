@@ -152,6 +152,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                         val c=URL(endpoint).openConnection() as HttpURLConnection
                         try {
                             c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true
+                            c.instanceFollowRedirects=true
                             c.useCaches=false
                             c.setRequestProperty("Connection","close")
                             c.setRequestProperty("Accept-Encoding","identity")
