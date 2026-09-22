@@ -592,9 +592,7 @@ class MainActivity : AppCompatActivity() {
         box.addView(settingCard("◌", "Lock on background", "Lock when RSS Downloader leaves the foreground", prefs.getBoolean("lockOnBackground", true)) { prefs.edit().putBoolean("lockOnBackground", it).apply() })
         box.addView(settingsSection("DOWNLOADS"))
         val location = prefs.getString("saveLocationUri", null)
-        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location
-Not selected" else "Default Save Location
-Custom folder selected", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
+        box.addView(panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; addView(text("↓", 20, accent(), true), LinearLayout.LayoutParams(dp(42), dp(42))); addView(text(if (location.isNullOrBlank()) "Default Save Location\nNot selected" else "Default Save Location\nCustom folder selected", 13, textColor(), true), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) }); addView(secondaryButton("Choose") { chooseSaveLocation() }) })
         box.addView(settingCard("↗", "Ask where to save", "Choose destination for each download", prefs.getBoolean("askSaveLocation", false)) { prefs.edit().putBoolean("askSaveLocation", it).apply() })
         box.addView(settingCard("Wi", "Wi-Fi only", "Restrict downloads to Wi-Fi", prefs.getBoolean("wifiOnly", false)) { prefs.edit().putBoolean("wifiOnly", it).apply() })
         box.addView(settingActionCard("HD", "Preferred video quality", qualityLabel("videoQuality", "Best available"), prefs.getString("videoQuality", "Best available") ?: "Best available") { chooseQuality("videoQuality", arrayOf("Best available", "1080p", "720p", "480p")) })
