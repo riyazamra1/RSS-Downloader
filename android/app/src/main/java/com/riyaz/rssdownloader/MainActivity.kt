@@ -131,14 +131,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildTopBar(): View = LinearLayout(this).apply {
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(10), dp(10), dp(12), dp(10))
-        layoutParams = LinearLayout.LayoutParams(-1, dp(74))
+        setPadding(dp(16), dp(12), dp(16), dp(10))
+        layoutParams = LinearLayout.LayoutParams(-1, dp(78))
         addView(button("☰", 46) { showMenu() }, LinearLayout.LayoutParams(dp(46), dp(46)))
-        addView(logoView(44), LinearLayout.LayoutParams(dp(44), dp(44)).apply { setMargins(dp(10), 0, dp(12), 0) })
+        addView(logoView(48), LinearLayout.LayoutParams(dp(48), dp(48)).apply { setMargins(dp(10), 0, dp(12), 0) })
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            addView(text("RSS Downloader", 17, textColor(), true))
-            addView(text("Fast. Organized. Controlled.", 11, muted(), false))
+            addView(text("RSS Downloader", 18, textColor(), true))
+            addView(text("Smart • Fast • Organized", 11, muted(), false).apply { setPadding(0, dp(2), 0, 0) })
         }, LinearLayout.LayoutParams(0, -2, 1f))
         addView(iconButton(R.drawable.ic_rss_settings, 46, "Settings") { showSettings() }, LinearLayout.LayoutParams(dp(46), dp(46)))
     }
@@ -147,25 +147,30 @@ class MainActivity : AppCompatActivity() {
     private fun buildBottomNav(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(8), 0, dp(8), 0)
-        setBackgroundColor(surface())
-        elevation = dp(8).toFloat()
+        setPadding(dp(10), dp(6), dp(10), dp(6))
+        background = rounded(surface(), 18)
+        elevation = dp(10).toFloat()
+        layoutParams = LinearLayout.LayoutParams(-1, dp(72)).apply {
+            setMargins(dp(12), 0, dp(12), dp(10))
+        }
         TabOrder.defaults.forEach { id ->
             val selected = id == currentTab
             val item = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setPadding(dp(4), dp(6), dp(4), dp(4))
-                background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+                setPadding(dp(4), dp(4), dp(4), dp(3))
+                background = rounded(if (selected) withAlpha(accent(), 28) else Color.TRANSPARENT, 14)
                 setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
             }
-            val label = text(tabShortLabel(id), 12, if (selected) accent() else muted(), selected)
-            item.addView(label)
-            val indicator = View(this@MainActivity).apply { setBackgroundColor(if (selected) accent() else Color.TRANSPARENT) }
-            item.addView(indicator, LinearLayout.LayoutParams(dp(28), dp(3)).apply { topMargin = dp(5) })
-            addView(item, LinearLayout.LayoutParams(0, dp(64), 1f))
+            item.addView(text(
+                when (id) { TabOrder.SOCIAL -> "↗"; TabOrder.TAMIL -> "▣"; else -> "◈" },
+                19, if (selected) accent() else muted(), true
+            ))
+            item.addView(text(tabShortLabel(id), 11, if (selected) textColor() else muted(), selected))
+            addView(item, LinearLayout.LayoutParams(0, dp(60), 1f).apply {
+                setMargins(dp(3), 0, dp(3), 0)
+            })
         }
-        layoutParams = LinearLayout.LayoutParams(-1, dp(64))
     }
 
     private fun showHome() {
@@ -178,18 +183,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildSocial(box: LinearLayout) {
-        val hero = panel().apply { setPadding(dp(24), dp(24), dp(24), dp(20)) }
-        hero.addView(text("SOCIAL DOWNLOADER", 10, Color.rgb(140, 156, 255), true))
-                val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(20), 0, 0) }
-        urlInput = EditText(this).apply { hint = "Paste URL here…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); setPadding(dp(16), 0, dp(16), 0); background = rounded(bg(), 14) }
-        row.addView(urlInput, LinearLayout.LayoutParams(0, dp(54), 1f))
-        row.addView(primaryButton("Analyze") { analyzeUrl() }, LinearLayout.LayoutParams(dp(120), dp(54)).apply { setMargins(dp(10), 0, 0, 0) })
-        hero.addView(row)
-        stateText = text("", 13, muted(), false).apply { visibility = View.GONE; setPadding(dp(12), dp(12), dp(12), dp(12)); background = rounded(surface(), 12) }
+        val hero = panel().apply { setPadding(dp(20), dp(20), dp(20), dp(18)) }
+        hero.addView(text("DOWNLOAD ANYWHERE", 10, accent(), true))
+        hero.addView(text("Paste a link. RSS handles the rest.", 23, textColor(), true).apply { setPadding(0, dp(6), 0, 0) })
+        hero.addView(text("Automatic clipboard detection • RSS Core analysis", 11, muted(), false).apply { setPadding(0, dp(5), 0, dp(16)) })
+        val inputShell = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(4), dp(4), dp(4)); background = rounded(surface2(), 16) }
+        urlInput = EditText(this).apply { hint = "Paste URL here…"; setHintTextColor(muted()); setTextColor(textColor()); setSingleLine(true); textSize = 14f; setPadding(dp(14), 0, dp(8), 0); background = ColorDrawableCompat.transparent() }
+        inputShell.addView(urlInput, LinearLayout.LayoutParams(0, dp(54), 1f))
+        inputShell.addView(secondaryButton("Paste") { readClipboardUrl(false) }, LinearLayout.LayoutParams(dp(76), dp(46)))
+        hero.addView(inputShell)
+        val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(10), 0, 0) }
+        actions.addView(primaryButton("Analyze URL") { analyzeUrl() }, LinearLayout.LayoutParams(0, dp(50), 1f))
+        actions.addView(secondaryButton("Clear") { urlInput.text.clear(); mediaPanel.visibility = View.GONE; stateText.visibility = View.GONE }, LinearLayout.LayoutParams(dp(92), dp(50)).apply { setMargins(dp(10), 0, 0, 0) })
+        hero.addView(actions)
+        stateText = text("", 13, muted(), false).apply { visibility = View.GONE; setPadding(dp(12), dp(12), dp(12), dp(12)); background = rounded(surface2(), 12) }
         hero.addView(stateText, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         box.addView(hero)
-        mediaPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(dp(18), dp(10), dp(18), 0) }
+        mediaPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(dp(4), dp(4), dp(4), 0) }
         box.addView(mediaPanel)
+        box.addView(buildStorageCard())
     }
 
     private fun buildStorageCard(): View {
@@ -700,10 +712,10 @@ class MainActivity : AppCompatActivity() {
     private fun applyTheme() { window.statusBarColor = bg(); window.navigationBarColor = bg() }
     private fun bg() = Color.parseColor(if (lightMode) "#F4F6FB" else "#070B16")
     private fun surface() = Color.parseColor(if (lightMode) "#FFFFFF" else "#0D1324")
-    private fun surface2() = Color.parseColor(if (lightMode) "#EDF1F8" else "#121A2D")
+    private fun surface2() = Color.parseColor(if (lightMode) "#F5F1E5" else "#171717")
     private fun textColor() = Color.parseColor(if (lightMode) "#152039" else "#EEF2FF")
     private fun muted() = Color.parseColor(if (lightMode) "#667085" else "#8E9AB4")
-    private fun accent() = Color.parseColor(if (lightMode) "#5969E8" else "#6C7CFF")
+    private fun accent() = Color.parseColor(if (lightMode) "#9A7416" else "#D4AF37")
     private fun panel() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(surface(), 22); setPadding(dp(18), dp(18), dp(18), dp(18)); elevation = dp(3).toFloat(); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) } }
     private fun text(value: String, size: Int, color: Int, bold: Boolean) = TextView(this).apply { text = value; textSize = size.toFloat(); setTextColor(color); typeface = if (bold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT }
     private fun iconButton(iconRes: Int, size: Int, description: String, onClick: () -> Unit) = ImageButton(this).apply {
@@ -717,7 +729,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun button(label: String, size: Int, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 20f; gravity = Gravity.CENTER; setTextColor(textColor()); background = rounded(surface2(), 14); setOnClickListener { onClick() }; layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)).apply { setMargins(0, 0, dp(8), 0) } }
-    private fun primaryButton(label: String, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD; background = rounded(accent(), 12); setPadding(dp(14), 0, dp(14), 0); setOnClickListener { onClick() }; minimumWidth = dp(92) }
+    private fun primaryButton(label: String, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.BLACK); typeface = android.graphics.Typeface.DEFAULT_BOLD; background = rounded(accent(), 14); setPadding(dp(14), 0, dp(14), 0); setOnClickListener { onClick() }; minimumWidth = dp(92) }
     private fun secondaryButton(label: String, onClick: () -> Unit) = TextView(this).apply { text = label; textSize = 13f; gravity = Gravity.CENTER; setTextColor(textColor()); typeface = android.graphics.Typeface.DEFAULT_BOLD; background = rounded(surface2(), 12); setPadding(dp(14), 0, dp(14), 0); setOnClickListener { onClick() }; minimumWidth = dp(92) }
     private fun logoView(size: Int) = ImageView(this).apply { setImageResource(R.drawable.rss_downloader_logo); scaleType = ImageView.ScaleType.CENTER_INSIDE; layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)) }
     private fun progress(percent: Int) = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100; progress = percent.coerceIn(0, 100); progressTintList = android.content.res.ColorStateList.valueOf(accent()); layoutParams = LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(8) } }
