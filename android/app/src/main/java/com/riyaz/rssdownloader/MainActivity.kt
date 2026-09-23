@@ -159,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(4), dp(4), dp(4), dp(3))
-                background = rounded(if (selected) withAlpha(accent(), 28) else Color.TRANSPARENT, 14)
+                background = rounded(if (selected) Color.argb(28, Color.red(accent()), Color.green(accent()), Color.blue(accent())) else Color.TRANSPARENT, 14)
                 setOnClickListener { if (currentTab != id) { currentTab = id; showHome() } }
             }
             item.addView(text(
