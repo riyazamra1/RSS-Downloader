@@ -107,13 +107,29 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     private fun execute(url: String, method: String, body: JSONObject?): Pair<Int, String> {
         val c = URL(url).openConnection() as HttpURLConnection
         return try {
-            c.requestMethod = method; c.connectTimeout = 15000; c.readTimeout = 30000; c.instanceFollowRedirects = true; c.setRequestProperty("Accept", "application/json")
+            // IMPORTANT: configure every request property before any operation that can
+            // implicitly establish the connection (including getOutputStream()).
+            // This prevents: "cannot set request property after connection is made".
+            c.requestMethod = method
+            c.connectTimeout = 15000
+            c.readTimeout = 30000
+            c.instanceFollowRedirects = true
+            c.useCaches = false
+            c.setRequestProperty("Accept", "application/json")
             // RSS Core identifies the calling product separately from the per-user app key.
             c.setRequestProperty("X-RSS-App-Id", "rss-downloader")
-            if (body != null) { c.doOutput = true; c.setRequestProperty("Content-Type", "application/json"); c.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) } }
             if (!accessToken.isNullOrBlank()) c.setRequestProperty("Authorization", "Bearer $accessToken")
             if (!appKey.isNullOrBlank()) c.setRequestProperty("X-RSS-App-Key", appKey)
-            val code = c.responseCode; val stream = if (code in 200..299) c.inputStream else c.errorStream; code to (stream?.bufferedReader()?.use { it.readText() }.orEmpty())
+            if (body != null) {
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                c.setFixedLengthStreamingMode(body.toString().toByteArray(Charsets.UTF_8).size)
+            }
+            val bodyBytes = body?.toString()?.toByteArray(Charsets.UTF_8)
+            if (bodyBytes != null) c.outputStream.use { it.write(bodyBytes) }
+            val code = c.responseCode
+            val stream = if (code in 200..299) c.inputStream else c.errorStream
+            code to (stream?.bufferedReader()?.use { it.readText() }.orEmpty())
         } finally { c.disconnect() }
     }
 }
