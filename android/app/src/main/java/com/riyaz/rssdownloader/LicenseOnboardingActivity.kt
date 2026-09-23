@@ -13,6 +13,10 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.view.Gravity
 import android.widget.*
@@ -40,6 +44,11 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private var animator: ValueAnimator? = null
     private var featureAnimator: ObjectAnimator? = null
     private lateinit var registerButton: TextView
+    private val verificationHandler = Handler(Looper.getMainLooper())
+    private var verificationExpiry = 0L
+    private lateinit var verificationCountdown: TextView
+    private lateinit var verificationCheck: TextView
+    private lateinit var verificationResend: TextView
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -58,13 +67,18 @@ class LicenseOnboardingActivity : AppCompatActivity() {
             return
         }
         if (prefs.getBoolean("registered", false)) {
-            if (prefs.getBoolean("onboarding_complete", false)) openApp() else showOnboarding()
+            if (prefs.getBoolean("email_verified", false)) {
+                if (prefs.getBoolean("onboarding_complete", false)) openApp() else showOnboarding()
+            } else {
+                showVerification()
+                checkVerification()
+            }
             return
         }
         showRegistration()
     }
 
-    override fun onDestroy() { animator?.cancel(); featureAnimator?.cancel(); executor.shutdownNow(); super.onDestroy() }
+    override fun onDestroy() { animator?.cancel(); featureAnimator?.cancel(); verificationHandler.removeCallbacksAndMessages(null); executor.shutdownNow(); super.onDestroy() }
 
     private fun background() {
         root = FrameLayout(this)
@@ -195,7 +209,18 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 registeredJson!!
             }
             runOnUiThread {
-                result.onSuccess { r -> prefs.edit().putBoolean("registered",true).putString("customer_id",r.optString("customer_id")).putString("app_key",r.optString("app_key")).putString("display_name",n).putString("email",e).putString("plan",r.optJSONObject("license")?.optString("plan").orEmpty()).putString("license_status",r.optJSONObject("license")?.optString("status").orEmpty()).apply(); showOnboarding() }
+                result.onSuccess { r ->
+                    val verified = r.optBoolean("email_verified", false)
+                    val expiry = r.optLong("verification_expires_at", 0L)
+                    prefs.edit().putBoolean("registered",true).putBoolean("email_verified",verified)
+                        .putLong("verification_expires_at",expiry)
+                        .putString("customer_id",r.optString("customer_id"))
+                        .putString("app_key",r.optString("app_key"))
+                        .putString("display_name",n).putString("email",e)
+                        .putString("plan",r.optJSONObject("license")?.optString("plan").orEmpty())
+                        .putString("license_status",r.optJSONObject("license")?.optString("status").orEmpty()).apply()
+                    if (verified) showOnboarding() else { showVerification(); updateVerificationCountdown() }
+                }
                     .onFailure {
                         status.text=it.message ?: "Registration failed. Please try again."
                         name.isEnabled=true; email.isEnabled=true
@@ -210,6 +235,78 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         val valid=name.text.toString().trim().isNotBlank() &&
             android.util.Patterns.EMAIL_ADDRESS.matcher(email.text.toString().trim()).matches()
         registerButton.visibility=if(valid) View.VISIBLE else View.GONE
+    }
+
+    private fun showVerification() {
+        background()
+        card=glass()
+        card.addView(logo(),LinearLayout.LayoutParams(-1,80.dp()))
+        card.addView(t("Verify your email",26,true))
+        val e=prefs.getString("email","") ?: ""
+        card.addView(t("We sent a verification link to $e.",14,false))
+        card.addView(t("Open the email and tap Verify Email. Then return here and check your status.",13,false))
+        verificationCountdown=t("Verification link valid for 24 hours",18,true)
+        card.addView(verificationCountdown,LinearLayout.LayoutParams(-1,44.dp()).apply{topMargin=14.dp()})
+        status=t("Email Verification Pending",13,true); card.addView(status)
+        verificationCheck=button("Check Verification Status")
+        card.addView(verificationCheck,LinearLayout.LayoutParams(-1,52.dp()).apply{topMargin=14.dp()})
+        verificationCheck.setOnClickListener{checkVerification()}
+        verificationResend=TextView(this).apply{text="Resend verification email";textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.rgb(212,175,55));isClickable=true}
+        card.addView(verificationResend,LinearLayout.LayoutParams(-1,48.dp()).apply{topMargin=4.dp()})
+        verificationResend.setOnClickListener{resendVerification()}
+        attach()
+        updateVerificationCountdown()
+    }
+
+    private fun updateVerificationCountdown() {
+        if(!::verificationCountdown.isInitialized)return
+        verificationExpiry=prefs.getLong("verification_expires_at",0L)
+        verificationHandler.removeCallbacksAndMessages(null)
+        val tick=object:Runnable{
+            override fun run(){
+                val left=(verificationExpiry-System.currentTimeMillis()).coerceAtLeast(0L)
+                val h=left/3600000; val m=(left%3600000)/60000; val s=(left%60000)/1000
+                verificationCountdown.text=if(left>0)String.format(java.util.Locale.US,"%02d:%02d:%02d remaining",h,m,s) else "Verification link expired"
+                if(left>0)verificationHandler.postDelayed(this,1000)
+            }
+        }
+        verificationHandler.post(tick)
+    }
+
+    private fun checkVerification() {
+        val email=prefs.getString("email","").orEmpty()
+        if(email.isBlank())return
+        verificationCheck.visibility=View.GONE
+        status.text="Checking verification…"
+        executor.execute {
+            val result=runCatching{
+                val base=BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')
+                val endpoint="$base/api/v1/license/verification-status?email="+java.net.URLEncoder.encode(email,"UTF-8")+"&project_key=rss-downloader"
+                val c=URL(endpoint).openConnection() as HttpURLConnection
+                try{c.requestMethod="GET";c.connectTimeout=12000;c.readTimeout=15000;c.useCaches=false;c.setRequestProperty("Accept","application/json");c.setRequestProperty("X-RSS-App-Id","rss-downloader");val code=c.responseCode;val stream=if(code in 200..299)c.inputStream else c.errorStream;val body=stream?.bufferedReader()?.use{it.readText()}.orEmpty();if(code !in 200..299)error(JSONObject(body).optString("error").ifBlank{"Verification status unavailable"});JSONObject(body)}finally{c.disconnect()}
+            }
+            runOnUiThread{
+                result.onSuccess{r->
+                    val verified=r.optBoolean("email_verified",false)
+                    if(verified){prefs.edit().putBoolean("email_verified",true).putLong("verification_expires_at",0L).apply();status.text="Email verified ✓";showOnboarding()}
+                    else{prefs.edit().putLong("verification_expires_at",r.optLong("verification_expires_at",prefs.getLong("verification_expires_at",0L))).apply();status.text=if(r.optBoolean("verification_expired",false))"Verification link expired — resend a new email." else "Email Verification Pending";verificationCheck.visibility=View.VISIBLE;updateVerificationCountdown()}
+                }.onFailure{status.text=it.message ?: "Verification status unavailable";verificationCheck.visibility=View.VISIBLE}
+            }
+        }
+    }
+
+    private fun resendVerification() {
+        val email=prefs.getString("email","").orEmpty(); val display=prefs.getString("display_name","").orEmpty()
+        if(email.isBlank())return
+        verificationResend.visibility=View.GONE;status.text="Sending verification email…"
+        executor.execute{
+            val result=runCatching{
+                val body=JSONObject().apply{put("email",email);put("display_name",display);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
+                val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/resend-verification").openConnection() as HttpURLConnection
+                try{c.requestMethod="POST";c.connectTimeout=12000;c.readTimeout=15000;c.doOutput=true;c.useCaches=false;c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Accept","application/json");c.setRequestProperty("X-RSS-App-Id","rss-downloader");c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))};val code=c.responseCode;val stream=if(code in 200..299)c.inputStream else c.errorStream;val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty();if(code !in 200..299)error(JSONObject(text).optString("error").ifBlank{"Unable to resend verification email"});JSONObject(text)}finally{c.disconnect()}
+            }
+            runOnUiThread{result.onSuccess{val expiry=System.currentTimeMillis()+24*60*60*1000L;prefs.edit().putLong("verification_expires_at",expiry).apply();status.text="Verification email sent.";verificationResend.visibility=View.VISIBLE;updateVerificationCountdown()}.onFailure{status.text=it.message ?: "Unable to resend verification email";verificationResend.visibility=View.VISIBLE}}
+        }
     }
 
     private fun showOnboarding() { background(); page=0; showPage() }
