@@ -69,7 +69,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun background() {
         root = FrameLayout(this)
         root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(10,18,42), Color.rgb(18,8,38), Color.rgb(5,24,34)))
+            intArrayOf(Color.rgb(7,7,7), Color.rgb(16,13,7), Color.rgb(7,7,7)))
         val particles = ParticleBackground(this)
         root.addView(particles, FrameLayout.LayoutParams(-1,-1))
         setContentView(root)
@@ -92,7 +92,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
             super.onDraw(canvas)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 1.2f
-            paint.color = Color.argb(34, 210, 230, 255)
+            paint.color = Color.argb(24,212,175,55)
             val w=width.toFloat(); val h=height.toFloat()
             val drift = (kotlin.math.sin(progress * Math.PI * 2) * 18f).toFloat()
             for (i in 0 until 9) {
@@ -106,7 +106,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
             for (p in points) {
                 val x=w*p[0] + drift*(p[1]-0.5f)
                 val y=h*p[1] - drift*(p[0]-0.5f)
-                paint.color=Color.argb(42,220,240,255)
+                paint.color=Color.argb(38,212,175,55)
                 canvas.drawCircle(x,y,p[2],paint)
             }
         }
@@ -216,7 +216,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
 
     private fun showPage() {
         card=glass(); card.addView(logo(),LinearLayout.LayoutParams(-1,72.dp()))
-        val featureIcon = TextView(this).apply { text = if (page == 0) "✓" else arrayOf("↗","🎬","▣","↓")[page-1]; textSize = 34f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = GradientDrawable().apply { setColor(Color.argb(75,91,108,240)); cornerRadius = 24.dp().toFloat() } }
+        val featureIcon = TextView(this).apply { text = if (page == 0) "✓" else arrayOf("↗","🎬","▣","↓")[page-1]; textSize = 34f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = GradientDrawable().apply { setColor(Color.argb(35,212,175,55)); cornerRadius = 24.dp().toFloat() } }
         card.addView(featureIcon, LinearLayout.LayoutParams(76.dp(),76.dp()).apply { gravity = Gravity.CENTER; bottomMargin = 12.dp() })
         featureAnimator?.cancel()
         featureAnimator = ObjectAnimator.ofFloat(featureIcon, "translationY", -8f, 8f).apply { duration = 1800; repeatCount = ObjectAnimator.INFINITE; repeatMode = ObjectAnimator.REVERSE; interpolator = AccelerateDecelerateInterpolator(); start() }
@@ -244,10 +244,10 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun openApp(){startActivity(android.content.Intent(this,MainActivity::class.java));finish()}
     private fun deviceId()=Settings.Secure.getString(contentResolver,Settings.Secure.ANDROID_ID).orEmpty().ifBlank{Build.MANUFACTURER+"-"+Build.MODEL+"-"+Build.VERSION.SDK_INT}
     private fun attach(){root.removeView(card);root.addView(card,FrameLayout.LayoutParams(-1,-2).apply{gravity=Gravity.CENTER;setMargins(18.dp(),18.dp(),18.dp(),18.dp())})}
-    private fun glass()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24.dp(),24.dp(),24.dp(),24.dp());background=GradientDrawable().apply{setColor(Color.argb(190,18,24,48));cornerRadius=28.dp().toFloat();setStroke(1.dp(),Color.argb(85,255,255,255))};elevation=10.dp().toFloat()}
+    private fun glass()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24.dp(),24.dp(),24.dp(),24.dp());background=GradientDrawable().apply{setColor(Color.argb(235,20,20,20));cornerRadius=28.dp().toFloat();setStroke(1.dp(),Color.argb(55,212,175,55))};elevation=10.dp().toFloat()}
     private fun logo()=ImageView(this).apply{setImageResource(R.drawable.rss_downloader_logo);scaleType=ImageView.ScaleType.CENTER_INSIDE;contentDescription="RSS Downloader"}
-    private fun input(h:String)=EditText(this).apply{hint=h;setHintTextColor(Color.rgb(145,155,180));setTextColor(Color.WHITE);setSingleLine();setPadding(16.dp(),0,16.dp(),0);background=GradientDrawable().apply{setColor(Color.argb(100,255,255,255));cornerRadius=16.dp().toFloat()}}
-    private fun button(s:String)=TextView(this).apply{text=s;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=android.graphics.Typeface.DEFAULT_BOLD;background=GradientDrawable().apply{setColor(Color.rgb(91,108,240));cornerRadius=16.dp().toFloat()}}
+    private fun input(h:String)=EditText(this).apply{hint=h;setHintTextColor(Color.rgb(170,170,170));setTextColor(Color.WHITE);setSingleLine();setPadding(16.dp(),0,16.dp(),0);background=GradientDrawable().apply{setColor(Color.argb(30,255,255,255));cornerRadius=16.dp().toFloat()}}
+    private fun button(s:String)=TextView(this).apply{text=s;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.BLACK);typeface=android.graphics.Typeface.DEFAULT_BOLD;background=GradientDrawable().apply{setColor(Color.rgb(212,175,55));cornerRadius=16.dp().toFloat()}}
     private fun t(s:String,z:Int,b:Boolean)=TextView(this).apply{text=s;textSize=z.toFloat();setTextColor(Color.WHITE);typeface=if(b)android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT}
     private fun Int.dp()=(this*resources.displayMetrics.density).toInt()
 }
