@@ -15,8 +15,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
 import android.view.Gravity
 import android.widget.*
@@ -305,7 +303,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/resend-verification").openConnection() as HttpURLConnection
                 try{c.requestMethod="POST";c.connectTimeout=12000;c.readTimeout=15000;c.doOutput=true;c.useCaches=false;c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Accept","application/json");c.setRequestProperty("X-RSS-App-Id","rss-downloader");c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))};val code=c.responseCode;val stream=if(code in 200..299)c.inputStream else c.errorStream;val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty();if(code !in 200..299)error(JSONObject(text).optString("error").ifBlank{"Unable to resend verification email"});JSONObject(text)}finally{c.disconnect()}
             }
-            runOnUiThread{result.onSuccess{val expiry=System.currentTimeMillis()+24*60*60*1000L;prefs.edit().putLong("verification_expires_at",expiry).apply();status.text="Verification email sent.";verificationResend.visibility=View.VISIBLE;updateVerificationCountdown()}.onFailure{status.text=it.message ?: "Unable to resend verification email";verificationResend.visibility=View.VISIBLE}}
+            runOnUiThread{result.onSuccess{val expiry=it.optLong("verification_expires_at",0L);if(expiry>0L)prefs.edit().putLong("verification_expires_at",expiry).apply();status.text="Verification email sent.";verificationResend.visibility=View.VISIBLE;updateVerificationCountdown()}.onFailure{status.text=it.message ?: "Unable to resend verification email";verificationResend.visibility=View.VISIBLE}}
         }
     }
 
