@@ -4,7 +4,23 @@ workflows:
     max_build_duration: 60
     environment:
       java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+
     scripts:
+      - name: Verify Android project
+        script: |
+          set -e
+          test -f android/settings.gradle.kts
+          test -f android/build.gradle.kts
+          test -f android/app/build.gradle.kts
+
       - name: Build debug APK
         script: |
           set -e
@@ -14,8 +30,10 @@ workflows:
           cd android
           gradle --version
           gradle --no-daemon --stacktrace :app:assembleDebug
+
     artifacts:
       - android/app/build/outputs/apk/debug/*.apk
+
     publishing:
       email:
         recipients:
