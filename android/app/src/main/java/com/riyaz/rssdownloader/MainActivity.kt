@@ -766,7 +766,31 @@ class MainActivity : AppCompatActivity() {
 
     private fun chooseSaveLocation() { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION), saveLocationRequestCode) }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) { super.onActivityResult(requestCode, resultCode, data); if (requestCode == saveLocationRequestCode && resultCode == RESULT_OK) data?.data?.let { uri -> runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }; prefs.edit().putString("saveLocationUri", uri.toString()).apply(); showSettings() } }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == saveLocationRequestCode && resultCode == RESULT_OK) {
+            data?.data?.let { uri ->
+                runCatching {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                }
+                prefs.edit().putString("saveLocationUri", uri.toString()).apply()
+                showSettings()
+            }
+            return
+        }
+        if (requestCode == createFileRequestCode) {
+            val job = pendingSaveJob
+            pendingSaveJob = null
+            if (resultCode == RESULT_OK && data?.data != null && job != null) {
+                downloadCompletedFile(job, data.data!!)
+            } else if (job != null) {
+                toast("Save cancelled. The completed download remains available.")
+            }
+        }
+    }
 
     private fun biometricAvailable(): Boolean = BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
