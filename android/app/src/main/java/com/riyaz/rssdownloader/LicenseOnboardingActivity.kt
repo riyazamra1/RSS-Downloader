@@ -174,7 +174,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         name.isEnabled=false; email.isEnabled=false; termsCheck.isEnabled=false
         executor.execute {
             val result=runCatching {
-                val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
+                val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId());put("terms_accepted",true)}.toString()
                 val base=BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')
                 val endpoints=arrayOf("$base/api/v1/license/register","$base/v1/license/register")
                 var lastCode=0
