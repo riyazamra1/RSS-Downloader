@@ -26,8 +26,6 @@ import java.util.concurrent.Executors
 
 class LicenseOnboardingActivity : AppCompatActivity() {
     companion object {
-        // TEMPORARY TEST MODE: bypass RSS Core registration until the Core endpoint is fixed.
-        // Set to false to restore real registration.
         private const val TEMP_SKIP_REGISTRATION = false
     }
 
@@ -42,6 +40,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private var animator: ValueAnimator? = null
     private var featureAnimator: ObjectAnimator? = null
     private lateinit var registerButton: TextView
+    private lateinit var termsCheck: CheckBox
     private val verificationHandler = Handler(Looper.getMainLooper())
     private var verificationExpiry = 0L
     private lateinit var verificationCountdown: TextView
@@ -126,13 +125,29 @@ class LicenseOnboardingActivity : AppCompatActivity() {
 
     private fun showRegistration() {
         background()
-        card=glass(); card.addView(logo(),LinearLayout.LayoutParams(-1,80.dp()))
-        card.addView(t("Welcome to RSS Downloader",25,true))
-        name=input("Customer name"); email=input("Email address")
+        card=glass()
+        card.addView(logo(),LinearLayout.LayoutParams(-1,80.dp()))
+        card.addView(t("Create your RSS Downloader account",25,true))
+        card.addView(t("One RSS account for app access, verification and multi-device sync.",13,false).apply{setTextColor(Color.rgb(190,190,190));setPadding(0,6.dp(),0,16.dp())})
+        name=input("Full name")
+        email=input("Email address")
         card.addView(name,LinearLayout.LayoutParams(-1,52.dp()).apply{bottomMargin=10.dp()})
         card.addView(email,LinearLayout.LayoutParams(-1,52.dp()).apply{bottomMargin=10.dp()})
-        status=t("",12,false); card.addView(status)
-        registerButton=button("Register & Continue")
+        termsCheck=CheckBox(this).apply{
+            text="I agree to the RSS Terms & Conditions and Privacy Policy"
+            textSize=12f
+            setTextColor(Color.rgb(220,220,220))
+            buttonTintList=android.content.res.ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Color.rgb(212,175,55), Color.rgb(150,150,150))
+            )
+            setPadding(0,2.dp(),0,2.dp())
+            setOnCheckedChangeListener{_,_->updateRegisterButton()}
+        }
+        card.addView(termsCheck,LinearLayout.LayoutParams(-1,48.dp()))
+        status=t("Your email will receive a verification link after registration.",12,false)
+        card.addView(status,LinearLayout.LayoutParams(-1,-2).apply{topMargin=4.dp()})
+        registerButton=button("Create Account")
         registerButton.visibility=View.GONE
         card.addView(registerButton,LinearLayout.LayoutParams(-1,52.dp()).apply{topMargin=12.dp()})
         registerButton.setOnClickListener{register()}
@@ -141,7 +156,8 @@ class LicenseOnboardingActivity : AppCompatActivity() {
             override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){ updateRegisterButton() }
             override fun afterTextChanged(s:Editable?){}
         }
-        name.addTextChangedListener(watcher); email.addTextChangedListener(watcher)
+        name.addTextChangedListener(watcher)
+        email.addTextChangedListener(watcher)
         attach()
         updateRegisterButton()
     }
@@ -149,8 +165,13 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun register() {
         val n=name.text.toString().trim(); val e=email.text.toString().trim()
         if(n.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()){status.text="Enter a name and valid email.";return}
+        if(!termsCheck.isChecked){
+            status.text="Please accept the RSS Terms & Conditions and Privacy Policy."
+            return
+        }
         registerButton.visibility=View.GONE
-        status.text="Registering…"; name.isEnabled=false; email.isEnabled=false
+        status.text="Creating your RSS account…"
+        name.isEnabled=false; email.isEnabled=false; termsCheck.isEnabled=false
         executor.execute {
             val result=runCatching {
                 val body=JSONObject().apply{put("email",e);put("display_name",n);put("project_key","rss-downloader");put("device_id",deviceId())}.toString()
@@ -221,7 +242,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                 }
                     .onFailure {
                         status.text=it.message ?: "Registration failed. Please try again."
-                        name.isEnabled=true; email.isEnabled=true
+                        name.isEnabled=true; email.isEnabled=true; termsCheck.isEnabled=true
                         updateRegisterButton()
                     }
             }
@@ -231,8 +252,10 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun updateRegisterButton() {
         if (!::registerButton.isInitialized) return
         val valid=name.text.toString().trim().isNotBlank() &&
-            android.util.Patterns.EMAIL_ADDRESS.matcher(email.text.toString().trim()).matches()
+            android.util.Patterns.EMAIL_ADDRESS.matcher(email.text.toString().trim()).matches() &&
+            ::termsCheck.isInitialized && termsCheck.isChecked
         registerButton.visibility=if(valid) View.VISIBLE else View.GONE
+        registerButton.alpha=if(valid) 1f else 0.45f
     }
 
     private fun showVerification() {
