@@ -496,6 +496,12 @@ class MainActivity : AppCompatActivity() {
             addView(text("${job.status} • ${job.progress ?: 0}%", 11, muted(), false))
             addView(progress(job.progress ?: 0))
             if (!job.error.isNullOrBlank()) addView(text(job.error, 11, Color.rgb(220, 90, 90), false))
+            if (job.status.uppercase(Locale.US) in setOf("COMPLETED", "COMPLETE", "SUCCESS", "FINISHED")) {
+                val saved = prefs.getStringSet("savedJobIds", emptySet())?.contains(job.jobId) == true
+                addView(primaryButton(if (saved) "Saved to device" else "Save to device") {
+                    if (!saved) saveCompletedJob(job)
+                }, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(8) })
+            }
         }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) })
     }
 
