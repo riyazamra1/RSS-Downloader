@@ -3,6 +3,7 @@ package com.riyaz.rssdownloader
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.io.OutputStream
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.Executors
@@ -12,7 +13,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     // RSS Core compatibility: current and legacy downloader gateways are both accepted.
     data class MediaOption(val id: String, val kind: String, val format: String, val quality: String?, val sizeBytes: Long?)
     data class SearchResult(val id: String, val requestId: String?, val title: String, val year: Int?, val thumbnailUrl: String?, val qualities: List<String>, val mediaOptions: List<MediaOption>, val rating: Double?, val ratingSource: String?, val budget: String?, val cost: String?, val releaseDate: String?, val runtime: String?, val genres: List<String>, val language: String?, val director: String?, val synopsis: String?)
-    data class Job(val jobId: String, val status: String, val progress: Int?, val title: String?, val thumbnailUrl: String?, val mediaKind: String?, val quality: String?, val format: String?, val downloadedBytes: Long?, val totalBytes: Long?, val speed: Long?, val eta: Long?, val error: String?)
+    data class Job(val jobId: String, val status: String, val progress: Int?, val title: String?, val thumbnailUrl: String?, val mediaKind: String?, val quality: String?, val format: String?, val downloadedBytes: Long?, val totalBytes: Long?, val speed: Long?, val eta: Long?, val error: String?, val filename: String?, val mimeType: String?)
     data class Analysis(val requestId: String, val title: String, val normalizedUrl: String, val thumbnailUrl: String?, val mediaOptions: List<MediaOption>)
 
     private val executor = Executors.newCachedThreadPool()
@@ -40,6 +41,48 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute { callback(runCatching { parseJob(requestObject("/api/downloader/download", "POST", JSONObject().put("requestId", requestId).put("mediaOptionId", optionId).put("authorizationApproved", true))) }) }
     fun listDownloads(callback: (Result<List<Job>>) -> Unit) = executor.execute { callback(runCatching { val a = requestObject("/api/downloader/downloads", "GET", null).optJSONArray("jobs") ?: JSONArray(); buildList { for (i in 0 until a.length()) add(parseJob(a.getJSONObject(i))) } }) }
     fun cancel(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { callback(runCatching { parseJob(requestObject("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) }) }
+
+    /**
+     * Streams a completed RAY file through RSS Core directly into the caller-provided
+     * SAF output stream. The RSS Core/RAY credentials remain inside request headers.
+     */
+    fun downloadFile(jobId: String, output: OutputStream, callback: (Result<Long>) -> Unit) = executor.execute {
+        callback(runCatching {
+            var copied = 0L
+            val connection = URL(baseUrl.trimEnd('/') + "/api/downloader/jobs/${enc(jobId)}/file").openConnection() as HttpURLConnection
+            try {
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 120000
+                connection.instanceFollowRedirects = true
+                connection.useCaches = false
+                connection.setRequestProperty("Accept", "*/*")
+                connection.setRequestProperty("X-RSS-App-Id", "rss-downloader")
+                if (!accessToken.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $accessToken")
+                if (!appKey.isNullOrBlank()) connection.setRequestProperty("X-RSS-App-Key", appKey)
+                val code = connection.responseCode
+                if (code !in 200..299) {
+                    val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    throw IllegalStateException("RSS Core file download failed ($code). ${error.take(240)}")
+                }
+                connection.inputStream.use { input ->
+                    val buffer = ByteArray(256 * 1024)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        if (read == 0) continue
+                        output.write(buffer, 0, read)
+                        copied += read
+                    }
+                    output.flush()
+                }
+                copied
+            } finally {
+                runCatching { output.close() }
+                connection.disconnect()
+            }
+        })
+    }
 
     fun checkPremium(email: String, callback: (Result<Boolean>) -> Unit) = executor.execute { callback(runCatching {
         if (email.isBlank() || appKey.isNullOrBlank()) return@runCatching false
@@ -86,7 +129,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     }
 
     private fun mediaOptions(array: JSONArray?): List<MediaOption> { if (array == null) return emptyList(); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; val id = o.optString("id").ifBlank { o.optString("mediaOptionId") }; if (id.isBlank()) continue; add(MediaOption(id, o.optString("kind", "media"), o.optString("format", ""), o.optString("quality", "").ifBlank { null }, if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null)) } } }
-    private fun parseJob(o: JSONObject) = Job(o.optString("jobId"), o.optString("status", "unknown"), if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { null }, o.optString("mediaKind", "").ifBlank { null }, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes"), longOrNull(o, "totalBytes"), longOrNull(o, "speedBytesPerSecond"), longOrNull(o, "etaSeconds"), o.optString("error", "").ifBlank { null })
+    private fun parseJob(o: JSONObject) = Job(o.optString("jobId"), o.optString("status", "unknown"), if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else null, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { null }, o.optString("mediaKind", "").ifBlank { null }, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes"), longOrNull(o, "totalBytes"), longOrNull(o, "speedBytesPerSecond"), longOrNull(o, "etaSeconds"), o.optString("error", "").ifBlank { null }, o.optString("filename", "").ifBlank { null }, o.optString("mimeType", "").ifBlank { null })
     private fun numberOrNull(o: JSONObject, key: String): Double? = if (o.has(key) && !o.isNull(key)) o.optDouble(key) else null
     private fun longOrNull(o: JSONObject, key: String): Long? = if (o.has(key) && !o.isNull(key)) o.optLong(key) else null
     private fun jsonStringList(a: JSONArray?): List<String> = if (a == null) emptyList() else buildList { for (i in 0 until a.length()) add(a.optString(i)) }
