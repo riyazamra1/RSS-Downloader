@@ -1,0 +1,30 @@
+workflows:
+  rss_downloader_android:
+    name: RSS Downloader Android
+    max_build_duration: 60
+    environment:
+      java: 17
+    scripts:
+      - name: Install Gradle 8.9
+        script: |
+          set -e
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          export PATH="/tmp/gradle-8.9/bin:$PATH"
+          cd android
+          gradle --version
+      - name: Build debug APK
+        script: |
+          set -e
+          export PATH="/tmp/gradle-8.9/bin:$PATH"
+          cd android
+          gradle --no-daemon --stacktrace :app:assembleDebug
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+    publishing:
+      email:
+        recipients:
+          - rsscctvsolution@gmail.com
+        notify:
+          success: true
+          failure: true
