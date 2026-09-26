@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.app.NotificationCompat
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -64,6 +66,9 @@ class DownloadKeepAliveService : Service() {
                     jobs.forEach { job ->
                         val status = job.status.uppercase(Locale.US)
                         val previous = lastStatuses.put(job.jobId, status)
+                        if (status in setOf("COMPLETED", "COMPLETE", "SUCCESS", "FINISHED")) {
+                            saveCompletedJobIfConfigured(job)
+                        }
                         if (previous != null && previous != status) {
                             val prefs = getSharedPreferences("rss-downloader", MODE_PRIVATE)
                             val title = job.title ?: "RSS Downloader"
@@ -96,6 +101,40 @@ class DownloadKeepAliveService : Service() {
         executor.execute {
             try { Thread.sleep(5000) } catch (_: InterruptedException) { return@execute }
             if (!stopping) pollDownloads()
+        }
+    }
+
+
+    private fun saveCompletedJobIfConfigured(job: NativeHostApi.Job) {
+        val prefs = getSharedPreferences("rss-downloader", MODE_PRIVATE)
+        if (prefs.getBoolean("askSaveLocation", false)) return
+        val tree = prefs.getString("saveLocationUri", null) ?: return
+        val saved = prefs.getStringSet("savedJobIds", emptySet())?.contains(job.jobId) == true
+        if (saved) return
+        val mime = job.mimeType?.takeIf { it.isNotBlank() }
+            ?: if (job.format?.contains("mp4", true) == true) "video/mp4"
+            else if (job.mediaKind?.contains("audio", true) == true) "audio/*"
+            else "application/octet-stream"
+        val filename = job.filename?.takeIf { it.isNotBlank() }
+            ?: (job.title ?: "RSS Download").replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifBlank { "RSS Download" }
+        val uri = runCatching {
+            DocumentsContract.createDocument(contentResolver, Uri.parse(tree), mime, filename)
+        }.getOrNull() ?: return
+        val output = runCatching { contentResolver.openOutputStream(uri) }.getOrNull()
+        if (output == null) {
+            runCatching { DocumentsContract.deleteDocument(contentResolver, uri) }
+            return
+        }
+        api.downloadFile(job.jobId, output) { result ->
+            result.onSuccess {
+                val current = prefs.getStringSet("savedJobIds", emptySet())?.toMutableSet() ?: mutableSetOf()
+                current.add(job.jobId)
+                prefs.edit().putStringSet("savedJobIds", current).apply()
+                notifyTerminal(job.jobId, "Download saved", job.title ?: "RSS Downloader", false)
+            }.onFailure {
+                runCatching { DocumentsContract.deleteDocument(contentResolver, uri) }
+                notifyTerminal(job.jobId, "Save failed", it.message ?: "Unable to save completed download.", true)
+            }
         }
     }
 
