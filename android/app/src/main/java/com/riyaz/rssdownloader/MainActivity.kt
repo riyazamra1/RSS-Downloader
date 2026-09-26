@@ -9,6 +9,8 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.os.Build
 import android.os.Bundle
 import android.os.StatFs
@@ -48,6 +50,9 @@ class MainActivity : AppCompatActivity() {
     private var authenticatedThisSession = false
     private var biometricPromptActive = false
     private val saveLocationRequestCode = 4201
+    private val createFileRequestCode = 4202
+    private var pendingSaveJob: NativeHostApi.Job? = null
+    private val saveInProgressJobs = mutableSetOf<String>()
     private var drawerOpen = false
     private val clipboardManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
@@ -447,10 +452,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
         api.createDownload(requestId, optionId) { result -> runOnUiThread {
-            result.onSuccess {
+            result.onSuccess { job ->
                 monetization.consumeDownload()
                 startDownloadKeepAlive()
                 showDownloads()
+                watchDownload(job.jobId)
             }.onFailure { toast(it.message ?: "Download failed.") }
         }}
     }
