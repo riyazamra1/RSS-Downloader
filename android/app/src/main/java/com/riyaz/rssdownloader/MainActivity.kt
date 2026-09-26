@@ -791,7 +791,8 @@ class MainActivity : AppCompatActivity() {
             val job = pendingSaveJob
             pendingSaveJob = null
             if (resultCode == RESULT_OK && data?.data != null && job != null) {
-                downloadCompletedFile(job, data.data!!)
+                val selectedUri = data.data
+                if (selectedUri != null) downloadCompletedFile(job, selectedUri)
             } else if (job != null) {
                 toast("Save cancelled. The completed download remains available.")
             }
