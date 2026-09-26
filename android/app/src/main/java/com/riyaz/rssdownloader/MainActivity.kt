@@ -79,12 +79,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestRuntimePermissions() {
         val permissions = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.READ_MEDIA_IMAGES
-            if (checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.READ_MEDIA_VIDEO
-        } else if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            permissions += Manifest.permission.READ_EXTERNAL_STORAGE
-        }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permissions += Manifest.permission.POST_NOTIFICATIONS
         if (permissions.isNotEmpty()) requestPermissions(permissions.toTypedArray(), 4102)
     }
@@ -455,7 +449,7 @@ class MainActivity : AppCompatActivity() {
         api.createDownload(requestId, optionId) { result -> runOnUiThread {
             result.onSuccess {
                 monetization.consumeDownload()
-                if (hasNotificationPermission()) startDownloadKeepAlive()
+                startDownloadKeepAlive()
                 showDownloads()
             }.onFailure { toast(it.message ?: "Download failed.") }
         }}
