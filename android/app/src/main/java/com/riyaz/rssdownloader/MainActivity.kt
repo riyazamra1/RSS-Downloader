@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
     private var drawerOpen = false
     private val clipboardManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
-        if (!isFinishing && ::urlInput.isInitialized) runOnUiThread { readClipboardUrl(prefs.getBoolean("autoAnalyze", true)) }
+        if (!isFinishing && ::urlInput.isInitialized) runOnUiThread { readClipboardUrl(prefs.getBoolean("autoAnalyzeClipboard", true)) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -345,7 +345,7 @@ class MainActivity : AppCompatActivity() {
     private fun analyzeUrl() {
         val url = urlInput.text.toString().trim()
         if (url.isBlank()) { toast("Paste a URL first."); return }
-        if (prefs.getBoolean("confirmAnalyze", false)) {
+        if (prefs.getBoolean("confirmClipboardAnalyze", false)) {
             AlertDialog.Builder(this).setTitle("Analyze URL?").setMessage(url)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Analyze") { _, _ -> analyzeUrlNow(url) }.show()
