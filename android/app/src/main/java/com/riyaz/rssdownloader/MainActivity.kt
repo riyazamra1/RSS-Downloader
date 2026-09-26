@@ -499,6 +499,120 @@ class MainActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) })
     }
 
+
+    private fun watchDownload(jobId: String) {
+        if (!saveInProgressJobs.add(jobId)) return
+        val poller = object : Runnable {
+            override fun run() {
+                if (isFinishing) {
+                    saveInProgressJobs.remove(jobId)
+                    return
+                }
+                api.listDownloads { result ->
+                    runOnUiThread {
+                        result.onSuccess { jobs ->
+                            val job = jobs.firstOrNull { it.jobId == jobId }
+                            val status = job?.status?.uppercase(Locale.US)
+                            if (job != null && status in setOf("COMPLETED", "COMPLETE", "SUCCESS", "FINISHED")) {
+                                saveInProgressJobs.remove(jobId)
+                                saveCompletedJob(job)
+                            } else if (job != null && status in setOf("FAILED", "ERROR", "CANCELLED", "CANCELED")) {
+                                saveInProgressJobs.remove(jobId)
+                                showDownloads()
+                            } else {
+                                window.decorView.postDelayed(this, 3000)
+                            }
+                        }.onFailure {
+                            window.decorView.postDelayed(this, 5000)
+                        }
+                    }
+                }
+            }
+        }
+        window.decorView.post(poller)
+    }
+
+    private fun saveCompletedJob(job: NativeHostApi.Job) {
+        val terminal = job.status.uppercase(Locale.US) in setOf("COMPLETED", "COMPLETE", "SUCCESS", "FINISHED")
+        if (!terminal) {
+            toast("Download is not complete yet.")
+            return
+        }
+        val saved = prefs.getStringSet("savedJobIds", emptySet())?.contains(job.jobId) == true
+        if (saved) {
+            toast("Already saved to device.")
+            return
+        }
+        val mime = job.mimeType?.takeIf { it.isNotBlank() } ?: mimeForJob(job)
+        val filename = job.filename?.takeIf { it.isNotBlank() } ?: defaultFilename(job)
+        val savedTree = prefs.getString("saveLocationUri", null)
+        if (prefs.getBoolean("askSaveLocation", false) || savedTree.isNullOrBlank()) {
+            pendingSaveJob = job
+            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = mime
+                putExtra(Intent.EXTRA_TITLE, filename)
+            }, createFileRequestCode)
+            return
+        }
+        val uri = runCatching {
+            DocumentsContract.createDocument(contentResolver, Uri.parse(savedTree), mime, filename)
+        }.getOrElse {
+            pendingSaveJob = job
+            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = mime
+                putExtra(Intent.EXTRA_TITLE, filename)
+            }, createFileRequestCode)
+            return
+        }
+        downloadCompletedFile(job, uri)
+    }
+
+    private fun downloadCompletedFile(job: NativeHostApi.Job, uri: Uri) {
+        val output = runCatching { contentResolver.openOutputStream(uri) }.getOrNull()
+        if (output == null) {
+            runCatching { DocumentsContract.deleteDocument(contentResolver, uri) }
+            toast("Unable to open the selected save location.")
+            return
+        }
+        toast("${job.title ?: "download"}…")
+        api.downloadFile(job.jobId, output) { result ->
+            runOnUiThread {
+                result.onSuccess {
+                    val current = prefs.getStringSet("savedJobIds", emptySet())?.toMutableSet() ?: mutableSetOf()
+                    current.add(job.jobId)
+                    prefs.edit().putStringSet("savedJobIds", current).apply()
+                    toast("Saved to device.")
+                    showDownloads()
+                }.onFailure {
+                    runCatching { DocumentsContract.deleteDocument(contentResolver, uri) }
+                    toast(it.message ?: "Unable to save the completed download.")
+                    showDownloads()
+                }
+            }
+        }
+    }
+
+    private fun mimeForJob(job: NativeHostApi.Job): String {
+        if (!job.mimeType.isNullOrBlank()) return job.mimeType
+        if (job.format?.contains("mp4", true) == true) return "video/mp4"
+        if (job.mediaKind?.contains("audio", true) == true) return "audio/*"
+        return "application/octet-stream"
+    }
+
+    private fun defaultFilename(job: NativeHostApi.Job): String {
+        val title = (job.title ?: "RSS Download")
+            .replace(Regex("[^A-Za-z0-9._ -]"), "_")
+            .trim()
+            .ifBlank { "RSS Download" }
+        return when (mimeForJob(job)) {
+            "video/mp4" -> if (title.endsWith(".mp4", true)) title else "${title}.mp4"
+            "audio/mpeg" -> if (title.endsWith(".mp3", true)) title else "${title}.mp3"
+            else -> title
+        }
+    }
+
     private fun showMenu() {
         if (drawerOpen) return
         drawerOpen=true
