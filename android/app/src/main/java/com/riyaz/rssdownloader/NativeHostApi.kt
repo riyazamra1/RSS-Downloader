@@ -29,7 +29,11 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
 
     fun search(tab: String, query: String, callback: (Result<List<SearchResult>>) -> Unit) = executor.execute {
         callback(runCatching {
-            val effectiveQuery = if (query.isBlank() && tab != TabOrder.SOCIAL) "latest Tamil movies 2026" else query
+            val effectiveQuery = if (query.isBlank()) when (tab) {
+                TabOrder.TAMIL -> "2026 Tamil films"
+                TabOrder.DUBBED -> "2026 Tamil dubbed films"
+                else -> query
+            } else query
             val json = requestObject("/api/downloader/search", "POST", JSONObject().put("tab", tab).put("query", effectiveQuery))
             val results = mutableListOf<SearchResult>(); val array = json.optJSONArray("results") ?: JSONArray()
             for (i in 0 until array.length()) { val item = array.getJSONObject(i); results += SearchResult(item.optString("id"), item.optString("requestId").ifBlank { null }, item.optString("title", "Untitled"), if (item.has("year") && !item.isNull("year")) item.optInt("year") else null, item.optString("thumbnailUrl", "").ifBlank { null }, jsonStringList(item.optJSONArray("qualities")), mediaOptions(item.optJSONArray("mediaOptions")), numberOrNull(item, "rating"), item.optString("ratingSource", "").ifBlank { null }, item.optString("budget", "").ifBlank { null }, item.optString("cost", "").ifBlank { null }, item.optString("releaseDate", "").ifBlank { null }, item.optString("runtime", "").ifBlank { null }, jsonStringList(item.optJSONArray("genres")), item.optString("language", "").ifBlank { null }, item.optString("director", "").ifBlank { null }, item.optString("synopsis", "").ifBlank { null }) }
