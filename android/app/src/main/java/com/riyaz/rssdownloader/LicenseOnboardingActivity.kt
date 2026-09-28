@@ -66,7 +66,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         if (prefs.getBoolean("registered", false)) {
             if (prefs.getBoolean("email_verified", false)) {
                 if (prefs.getBoolean("onboarding_complete", false)) {
-                    sendReturningSession()
+                    openApp()
                 } else {
                     showOnboarding()
                 }
