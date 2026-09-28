@@ -25,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.appcompat.app.AppCompatDelegate
 import com.riyaz.rss.common.RssBrand
-import com.riyaz.rss.common.commonpages.RssAboutPage
 import com.riyaz.rss.common.components.RssSettingRow
 import com.riyaz.rss.common.theme.RssTheme
 
@@ -255,7 +254,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         AlertDialog(
             onDismissRequest = { aboutDialog = false },
             title = { Text("About") },
-            text = { RssAboutPage() },
+            text = { Text("RSS Downloader\n\n${RssBrand.COMPANY_NAME}") },
             confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text("Close") } }
         )
     }
