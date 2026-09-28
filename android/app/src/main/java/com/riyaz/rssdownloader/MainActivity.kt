@@ -1,455 +1,338 @@
 package com.riyaz.rssdownloader
 
-import android.content.ClipboardManager
-import android.content.Context
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.Gravity
-import android.view.View
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AlertDialog
+import android.content.Context
+import android.content.ClipboardManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.appcompat.app.AppCompatDelegate
+import com.riyaz.rss.common.RssBrand
+import com.riyaz.rss.common.commonpages.RssAboutPage
+import com.riyaz.rss.common.components.RssSettingRow
+import com.riyaz.rss.common.theme.RssTheme
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
-    private val api by lazy {
-        NativeHostApi(BuildConfig.RSS_HOST_BASE_URL,
-            BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null },
-            prefs.getString("app_key", null))
-    }
-    private val clipboard by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
-    private val handler = Handler(Looper.getMainLooper())
-    private lateinit var content: LinearLayout
-    private var mainTab = 0
-    private var movieTab = 0
-    private var socialUrl: EditText? = null
-    private var pendingAnalyze: Runnable? = null
+    private val api by lazy { NativeHostApi(BuildConfig.RSS_HOST_BASE_URL, BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null }, prefs.getString("app_key", null)) }
 
     override fun onCreate(state: Bundle?) {
-        applyTheme(prefs.getString("theme","System default") ?: "System default")
+        applyTheme(prefs.getString("theme", "System default") ?: "System default")
         super.onCreate(state)
-        buildRoot()
-        loadClipboard()
-    }
-
-    override fun onDestroy() {
-        pendingAnalyze?.let(handler::removeCallbacks)
-        handler.removeCallbacksAndMessages(null)
-        super.onDestroy()
-    }
-
-    private fun buildRoot() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(9,9,9))
+        setContent {
+            val dark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            RssTheme(darkTheme = dark) { DownloaderApp(api, prefs) }
         }
-        content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16),dp(12),dp(16),dp(16))
-        }
-        root.addView(ScrollView(this).apply { isFillViewport=true; addView(content) },
-            LinearLayout.LayoutParams(-1,0,1f))
-        root.addView(mainNavigation(), LinearLayout.LayoutParams(-1,dp(72)))
-        setContentView(root)
-        render()
     }
 
-    private fun mainNavigation(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        setPadding(dp(8),dp(6),dp(8),dp(8))
-        setBackgroundColor(Color.rgb(12,12,12))
-        elevation = dp(8).toFloat()
-        val items = listOf(Triple("⌂","Social","Social Downloader"),Triple("▣","Movies","Movie"),Triple("⚙","Settings","Settings"))
-        items.forEachIndexed { index, item ->
-            val selected = mainTab == index
-            val box = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(dp(4),dp(4),dp(4),dp(3))
-                setBackgroundColor(if(selected) Color.rgb(42,36,20) else Color.TRANSPARENT)
-                isClickable = true
-                isFocusable = true
-                contentDescription = item.third
-                setOnClickListener { mainTab=index; render() }
+    private fun applyTheme(theme: String) {
+        val mode = when (theme) {
+            "Light" -> AppCompatDelegate.MODE_NIGHT_NO
+            "Dark" -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        if (AppCompatDelegate.getDefaultNightMode() != mode) AppCompatDelegate.setDefaultNightMode(mode)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPreferences) {
+    val context = LocalContext.current
+    var tab by remember { mutableIntStateOf(0) }
+    var movieTab by remember { mutableIntStateOf(0) }
+    var movieSearch by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var analysis by remember { mutableStateOf<NativeHostApi.AnalyzeResult?>(null) }
+    var analysisError by remember { mutableStateOf<String?>(null) }
+    var movies by remember { mutableStateOf<List<NativeHostApi.SearchResult>>(emptyList()) }
+    var movieError by remember { mutableStateOf<String?>(null) }
+    var selectedMovie by remember { mutableStateOf<NativeHostApi.SearchResult?>(null) }
+    var themeDialog by remember { mutableStateOf(false) }
+    var aboutDialog by remember { mutableStateOf(false) }
+    var lastAnalyzed by remember { mutableStateOf("") }
+
+    DisposableEffect(Unit) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        fun readClipboard() {
+            val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
+            if (value.startsWith("http://") || value.startsWith("https://")) url = value
+        }
+        readClipboard()
+        val listener = ClipboardManager.OnPrimaryClipChangedListener { readClipboard() }
+        clipboard.addPrimaryClipChangedListener(listener)
+        onDispose { clipboard.removePrimaryClipChangedListener(listener) }
+    }
+
+    LaunchedEffect(url) {
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            kotlinx.coroutines.delay(500)
+            if (url == lastAnalyzed) return@LaunchedEffect
+            lastAnalyzed = url
+            analysis = null
+            analysisError = null
+            api.analyze(url) { result ->
+                result.onSuccess { analysis = it }.onFailure { analysisError = it.message ?: "Analysis failed" }
             }
-            box.addView(TextView(this@MainActivity).apply {
-                text = item.first; textSize = if(selected) 20f else 18f; gravity = Gravity.CENTER
-                setTextColor(if(selected) Color.rgb(212,175,55) else Color.rgb(155,155,155))
-            }, LinearLayout.LayoutParams(-1,dp(25)))
-            box.addView(TextView(this@MainActivity).apply {
-                text = item.second; textSize = 11f; gravity = Gravity.CENTER
-                setTextColor(if(selected) Color.WHITE else Color.rgb(155,155,155))
-                typeface = if(selected) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-            }, LinearLayout.LayoutParams(-1,dp(20)))
-            addView(box, LinearLayout.LayoutParams(0,dp(58),1f).apply { setMargins(dp(3),0,dp(3),0) })
         }
     }
 
-    private fun render() {
-        content.removeAllViews()
-        when(mainTab) {
-            0 -> renderSocial()
-            1 -> renderMovie()
-            else -> renderSettings()
+    LaunchedEffect(tab, movieTab, movieSearch) {
+        if (tab != 1) return@LaunchedEffect
+        movieError = null
+        val source = if (movieTab == 0) "tamil-movies" else "tamil-dubbed-movies"
+        api.search(source, movieSearch) { result ->
+            result.onSuccess { movies = it }.onFailure { movieError = it.message ?: "Movie source error"; movies = emptyList() }
         }
     }
 
-    private fun renderSocial() {
-        content.addView(label("Social Downloader",28,Color.WHITE,true))
-        content.addView(label("Paste a link. RSS Downloader detects and analyzes it automatically.",
-            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
+    BackHandler(enabled = selectedMovie != null) { selectedMovie = null }
 
-        val card=card()
-        card.addView(label("AUTOMATIC URL DETECTION",11,Color.rgb(212,175,55),true))
-        val input=EditText(this).apply {
-            hint="Paste supported URL"
-            setHintTextColor(Color.rgb(115,115,115))
-            setTextColor(Color.WHITE)
-            textSize=15f
-            maxLines=1
-            setPadding(dp(14),0,dp(14),0)
-            setBackgroundColor(Color.rgb(28,28,28))
-            setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_share,0,0,0)
-            compoundDrawablePadding=dp(10)
-            contentDescription="Social media URL"
-        }
-        socialUrl=input
-        card.addView(input,LinearLayout.LayoutParams(-1,dp(56)))
-        card.addView(label("Automatic analysis starts after a valid link is detected.",
-            12,Color.rgb(155,155,155),false).apply { setPadding(0,dp(9),0,dp(0)) })
-        content.addView(card)
-
-        val supported=card()
-        supported.addView(label("SUPPORTED SOURCES",11,Color.rgb(212,175,55),true))
-        supported.addView(label("Facebook  •  Instagram  •  X  •  Telegram",
-            13,Color.WHITE,false).apply { setPadding(0,dp(8),0,dp(3)) })
-        supported.addView(label("WhatsApp Status  •  Pinterest",
-            13,Color.rgb(185,185,185),false))
-        content.addView(supported)
-
-        input.addTextChangedListener(object: android.text.TextWatcher {
-            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
-            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) {
-                scheduleAnalysis(s.toString())
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                NavigationBarItem(tab == 0, { tab = 0; selectedMovie = null }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Social") })
+                NavigationBarItem(tab == 1, { tab = 1; selectedMovie = null }, icon = { Icon(Icons.Default.Movie, null) }, label = { Text("Movies") })
+                NavigationBarItem(tab == 2, { tab = 2; selectedMovie = null }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
             }
-            override fun afterTextChanged(s:android.text.Editable?){}
-        })
-        content.addView(connectionCard())
-    }
-
-    private fun scheduleAnalysis(value:String) {
-        pendingAnalyze?.let(handler::removeCallbacks)
-        val url=value.trim()
-        if (!url.startsWith("https://") && !url.startsWith("http://")) return
-        pendingAnalyze=Runnable { analyze(url) }
-        handler.postDelayed(pendingAnalyze!!,650)
-    }
-
-    private fun analyze(url:String) {
-        if(mainTab!=0 || socialUrl?.text.toString().trim()!=url) return
-        val loading=label("Analyzing…",13,Color.rgb(212,175,55),false)
-        content.addView(loading)
-        api.analyze(url) { result ->
-            runOnUiThread {
-                if(loading.parent===content) content.removeView(loading)
-                result.onSuccess { a ->
-                    val card=card()
-                    card.addView(label(a.title,18,Color.WHITE,true))
-                    if(a.mediaOptions.isEmpty()) {
-                        card.addView(label("No downloadable format returned.",13,Color.rgb(180,180,180),false))
-                    } else {
-                        a.mediaOptions.forEach { option ->
-                            val quality=option.quality ?: "Available"
-                            val text=option.format.uppercase()+" • "+quality
-                            card.addView(button(text,48) {
-                                api.createDownload(a.requestId,option.id) { r ->
-                                    runOnUiThread {
-                                        r.onSuccess { Toast.makeText(this,"Download queued.",Toast.LENGTH_SHORT).show() }
-                                            .onFailure { Toast.makeText(this,it.message ?: "Download failed.",Toast.LENGTH_LONG).show() }
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (selectedMovie != null) {
+                item { MovieDetails(selectedMovie!!, api) { selectedMovie = null } }
+            } else {
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(com.riyaz.rssdownloader.R.drawable.rss_downloader_logo),
+                            contentDescription = "RSS Downloader",
+                            modifier = Modifier.size(46.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            when (tab) { 0 -> "Social Downloader"; 1 -> "Movies"; else -> "Settings" },
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                when (tab) {
+                    0 -> {
+                        item {
+                            Card(shape = RoundedCornerShape(20.dp)) {
+                                Column(Modifier.padding(16.dp)) {
+                                    OutlinedTextField(
+                                        value = url,
+                                        onValueChange = { url = it.trim() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        leadingIcon = { Icon(Icons.Default.Link, null) },
+                                        label = { Text("Paste URL") }
+                                    )
+                                    if (url.isNotBlank() && url.startsWith("http")) {
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(analysis?.title ?: analysisError ?: "Analyzing…")
                                     }
                                 }
-                            },LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(7) })
+                            }
                         }
-                    }
-                    content.addView(card)
-                }.onFailure { error ->
-                    content.addView(label("Analysis failed: "+(error.message ?: "Unknown error"),
-                        12,Color.rgb(220,120,120),false))
-                }
-            }
-        }
-    }
-
-    private fun renderMovie() {
-        content.addView(label("Movies",28,Color.WHITE,true))
-        content.addView(label("Browse the pre-loaded catalogue or search within a category.",
-            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
-
-        val sub=LinearLayout(this).apply {
-            setPadding(dp(4),dp(4),dp(4),dp(4))
-            setBackgroundColor(Color.rgb(20,20,20))
-        }
-        val tamil=button(if(movieTab==0) "● Tamil" else "Tamil",44) { movieTab=0; render() }
-        val dubbed=button(if(movieTab==1) "● Dubbed" else "Dubbed",44) { movieTab=1; render() }
-        sub.addView(tamil,LinearLayout.LayoutParams(0,dp(44),1f))
-        sub.addView(dubbed,LinearLayout.LayoutParams(0,dp(44),1f).apply { leftMargin=dp(6) })
-        content.addView(sub)
-
-        val searchCard=card()
-        searchCard.addView(label("MOVIE SEARCH",11,Color.rgb(212,175,55),true))
-        val search=EditText(this).apply {
-            hint=if(movieTab==0) "Search Tamil movies" else "Search Tamil dubbed movies"
-            setHintTextColor(Color.rgb(115,115,115))
-            setTextColor(Color.WHITE)
-            textSize=15f
-            maxLines=1
-            setPadding(dp(14),0,dp(14),0)
-            setBackgroundColor(Color.rgb(28,28,28))
-            imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
-        }
-        searchCard.addView(search,LinearLayout.LayoutParams(-1,dp(54)).apply { topMargin=dp(8) })
-        search.setOnEditorActionListener { _, actionId, _ ->
-            if(actionId==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                loadMovies(search.text.toString()); true
-            } else false
-        }
-        content.addView(searchCard)
-
-        val catalogue=card()
-        catalogue.addView(label(if(movieTab==0) "TAMIL CATALOGUE" else "DUBBED CATALOGUE",
-            11,Color.rgb(212,175,55),true))
-        catalogue.addView(label("Loading pre-loaded movies…",12,Color.rgb(155,155,155),false)
-            .apply { setPadding(0,dp(8),0,dp(0)) })
-        content.addView(catalogue)
-        loadMovies("")
-    }
-
-    private fun loadMovies(query:String) {
-        val loading=label("Loading catalogue…",13,Color.rgb(212,175,55),false)
-        content.addView(loading)
-        val tab=if(movieTab==0) "tamil-movies" else "tamil-dubbed-movies"
-        api.search(tab,query) { result ->
-            runOnUiThread {
-                if(loading.parent===content) content.removeView(loading)
-                result.onSuccess { movies ->
-                    val section=card()
-                    section.addView(label(if(query.isBlank()) "AVAILABLE MOVIES" else "SEARCH RESULTS",
-                        11,Color.rgb(212,175,55),true))
-                    if(movies.isEmpty()) {
-                        section.addView(label("No movies returned from the configured source.",
-                            13,Color.rgb(180,180,180),false).apply { setPadding(0,dp(10),0,dp(0)) })
-                    } else movies.forEachIndexed { index,movie ->
-                        val row=LinearLayout(this).apply {
-                            orientation=LinearLayout.VERTICAL
-                            setPadding(dp(2),dp(13),dp(2),dp(13))
-                            isClickable=true
-                            isFocusable=true
-                        }
-                        row.addView(label(movie.title,17,Color.WHITE,true))
-                        val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate)
-                            .joinToString(" • ")
-                        if(meta.isNotBlank()) row.addView(label(meta,12,Color.rgb(160,160,160),false)
-                            .apply { setPadding(0,dp(5),0,0) })
-                        row.addView(label("View details  ›",12,Color.rgb(212,175,55),false)
-                            .apply { setPadding(0,dp(7),0,dp(0)) })
-                        row.setOnClickListener { showMovie(movie) }
-                        section.addView(row)
-                        if(index < movies.lastIndex) section.addView(divider())
-                    }
-                    content.addView(section)
-                }.onFailure { error ->
-                    content.addView(label("Movie source error: "+(error.message ?: "Unknown error"),
-                        12,Color.rgb(220,120,120),false))
-                }
-            }
-        }
-    }
-
-    private fun showMovie(movie:NativeHostApi.SearchResult) {
-        content.removeAllViews()
-        content.addView(label("Movie Details",26,Color.WHITE,true))
-        content.addView(label("Review the movie information and choose an available quality.",
-            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
-
-        val info=card()
-        info.addView(label(movie.title,21,Color.WHITE,true))
-        val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate,movie.runtime,movie.director)
-            .joinToString(" • ")
-        if(meta.isNotBlank()) info.addView(label(meta,12,Color.rgb(165,165,165),false)
-            .apply { setPadding(0,dp(6),0,dp(0)) })
-        movie.synopsis?.takeIf { it.isNotBlank() }?.let {
-            info.addView(label(it,13,Color.rgb(205,205,205),false).apply {
-                setPadding(0,dp(14),0,dp(0))
-            })
-        }
-        content.addView(info)
-
-        val quality=card()
-        quality.addView(label("AVAILABLE QUALITY",11,Color.rgb(212,175,55),true))
-        if(movie.mediaOptions.isEmpty()) {
-            quality.addView(label("No authorized download options are currently available.",
-                13,Color.rgb(180,180,180),false).apply { setPadding(0,dp(9),0,dp(0)) })
-        } else {
-            movie.mediaOptions.forEach { option ->
-                val qualityName=(option.quality ?: "Available").uppercase()
-                val formatName=option.format.uppercase()
-                quality.addView(button("$formatName  •  $qualityName",50) {
-                    api.createDownload(movie.requestId ?: movie.id,option.id) { r ->
-                        runOnUiThread {
-                            r.onSuccess {
-                                Toast.makeText(this,"Download queued.",Toast.LENGTH_SHORT).show()
-                            }.onFailure {
-                                Toast.makeText(this,it.message ?: "Download failed.",Toast.LENGTH_LONG).show()
+                        analysis?.let { result ->
+                            item {
+                                Card(shape = RoundedCornerShape(20.dp)) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                        result.mediaOptions.forEach { option ->
+                                            Button(
+                                                onClick = {
+                                                    api.createDownload(result.requestId, option.id) {
+                                                        if (it.isSuccess) Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                                            ) {
+                                                Icon(Icons.Default.Download, null)
+                                                Spacer(Modifier.width(8.dp))
+                                                Text("${option.format.uppercase()} • ${option.quality ?: "Available"}")
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                },LinearLayout.LayoutParams(-1,dp(50)).apply { topMargin=dp(8) })
-            }
-        }
-        content.addView(quality)
-        content.addView(button("Back to Movies",48) { render() },
-            LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(12) })
-    }
-
-    private fun renderSettings() {
-        content.addView(label("Settings",28,Color.WHITE,true))
-        content.addView(label("RSS Downloader preferences and account controls.",
-            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
-
-        val account=card()
-        account.addView(label("ACCOUNT",11,Color.rgb(212,175,55),true))
-        account.addView(label("RSS Core account",16,Color.WHITE,true).apply { setPadding(0,dp(8),0,dp(2)) })
-        account.addView(label("Registration, verification and session status",12,Color.rgb(165,165,165),false))
-        account.addView(button("Manage Account  ›",46) {
-            Toast.makeText(this,"Account management will use the RSS Core session.",Toast.LENGTH_SHORT).show()
-        },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
-        content.addView(account)
-
-        val downloads=card()
-        downloads.addView(label("DOWNLOADS",11,Color.rgb(212,175,55),true))
-        downloads.addView(settingsRow("Download location","Choose where completed files are saved"))
-        downloads.addView(settingsRow("Download history","View completed and queued downloads"))
-        content.addView(downloads)
-
-        val appearance=card()
-        appearance.addView(label("APPEARANCE",11,Color.rgb(212,175,55),true))
-        appearance.addView(settingsRow("Theme","Light / Dark / System"))
-        appearance.addView(settingsRow("Interface","RSS KIT visual system"))
-        content.addView(appearance)
-
-        val service=card()
-        service.addView(label("RSS SERVICES",11,Color.rgb(212,175,55),true))
-        service.addView(settingsRow("Premium","Premium entitlement is controlled by RSS Core"))
-        service.addView(settingsRow("Connection","RSS Core control plane • RAY server-side"))
-        content.addView(service)
-
-        val information=card()
-        information.addView(label("INFORMATION",11,Color.rgb(212,175,55),true))
-        information.addView(settingsRow("About","RSS Downloader information"))
-        information.addView(settingsRow("Privacy Policy","Privacy information"))
-        information.addView(settingsRow("Terms & Conditions","Terms information"))
-        content.addView(information)
-    }
-
-    private fun settingsRow(title:String,subtitle:String):View=LinearLayout(this).apply {
-        orientation=LinearLayout.VERTICAL
-        setPadding(dp(2),dp(12),dp(2),dp(12))
-        isClickable=true
-        isFocusable=true
-        addView(label(title+"  ›",15,Color.WHITE,true))
-        addView(label(subtitle,12,Color.rgb(165,165,165),false).apply { setPadding(0,dp(4),0,0) })
-        setOnClickListener {
-            when(title) {
-                "Theme" -> showThemeChooser()
-                "Download location" -> Toast.makeText(this@MainActivity,"Download location selection will be connected to Android storage.",Toast.LENGTH_SHORT).show()
-                "Download history" -> Toast.makeText(this@MainActivity,"Download history will be connected to RSS Core jobs.",Toast.LENGTH_SHORT).show()
-                "Premium" -> Toast.makeText(this@MainActivity,"Premium entitlement is controlled by RSS Core.",Toast.LENGTH_SHORT).show()
-                "Connection" -> Toast.makeText(this@MainActivity,"RSS Core connection: "+if(api.configured()) "configured" else "not configured",Toast.LENGTH_SHORT).show()
-                "About" -> Toast.makeText(this@MainActivity,"RSS Downloader • RSS KIT interface • RSS Core + RAY",Toast.LENGTH_LONG).show()
-                "Privacy Policy" -> Toast.makeText(this@MainActivity,"Privacy Policy will open from the RSS Core hosted policy.",Toast.LENGTH_SHORT).show()
-                "Terms & Conditions" -> Toast.makeText(this@MainActivity,"Terms & Conditions will open from the RSS Core hosted terms.",Toast.LENGTH_SHORT).show()
-                "Interface" -> Toast.makeText(this@MainActivity,"RSS KIT visual system",Toast.LENGTH_SHORT).show()
+                    1 -> {
+                        item {
+                            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                                SegmentedButton(movieTab == 0, { movieTab = 0 }, SegmentedButtonDefaults.itemShape(0, 2)) { Text("Tamil") }
+                                SegmentedButton(movieTab == 1, { movieTab = 1 }, SegmentedButtonDefaults.itemShape(1, 2)) { Text("Dubbed") }
+                            }
+                        }
+                        item {
+                            OutlinedTextField(
+                                value = movieSearch,
+                                onValueChange = { movieSearch = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                leadingIcon = { Icon(Icons.Default.Search, null) },
+                                label = { Text("Search") }
+                            )
+                        }
+                        movieError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
+                        items(movies) { movie ->
+                            Card(Modifier.fillMaxWidth().clickable { selectedMovie = movie }, shape = RoundedCornerShape(18.dp)) {
+                                Column(Modifier.padding(16.dp)) {
+                                    Text(movie.title, fontWeight = FontWeight.Bold)
+                                    val meta = listOfNotNull(movie.year?.toString(), movie.language, movie.releaseDate).joinToString(" • ")
+                                    if (meta.isNotBlank()) Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Details  ›", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+                                }
+                            }
+                        }
+                        if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    else -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }) }
+                }
             }
         }
     }
 
-    private fun showThemeChooser() {
-        val options = arrayOf("System default","Light","Dark")
-        val current = prefs.getString("theme","System default")
-        AlertDialog.Builder(this).setTitle("Appearance")
-            .setSingleChoiceItems(options, options.indexOf(current).coerceAtLeast(0)) { dialog, which ->
-                prefs.edit().putString("theme",options[which]).apply()
-                applyTheme(options[which])
-                dialog.dismiss()
-            }.show()
+    if (themeDialog) {
+        val options = listOf("System default", "Light", "Dark")
+        val current = prefs.getString("theme", "System default") ?: "System default"
+        AlertDialog(
+            onDismissRequest = { themeDialog = false },
+            title = { Text("Theme") },
+            text = {
+                Column {
+                    options.forEach { option ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                prefs.edit().putString("theme", option).apply()
+                                val mode = when (option) {
+                                    "Light" -> AppCompatDelegate.MODE_NIGHT_NO
+                                    "Dark" -> AppCompatDelegate.MODE_NIGHT_YES
+                                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                                }
+                                AppCompatDelegate.setDefaultNightMode(mode)
+                                themeDialog = false
+                            }.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(if (option == current) "● " else "○ ")
+                            Text(option)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { themeDialog = false }) { Text("Close") } }
+        )
     }
 
-    private fun applyTheme(theme:String) {
-        val mode = when(theme) {
-            "Light" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
-            "Dark" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
-            else -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    if (aboutDialog) {
+        AlertDialog(
+            onDismissRequest = { aboutDialog = false },
+            title = { Text("About") },
+            text = { RssAboutPage() },
+            confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text("Close") } }
+        )
+    }
+}
+
+@Composable
+private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, onBack: () -> Unit) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TextButton(onClick = onBack) { Text("‹ Movies") }
+        Card(shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Text(movie.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                val meta = listOfNotNull(movie.year?.toString(), movie.language, movie.releaseDate, movie.runtime, movie.director).joinToString(" • ")
+                if (meta.isNotBlank()) Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                movie.synopsis?.takeIf { it.isNotBlank() }?.let { Text(it, Modifier.padding(top = 12.dp)) }
+            }
         }
-        if(androidx.appcompat.app.AppCompatDelegate.getDefaultNightMode()!=mode)
-            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(mode)
-    }
-
-    private fun connectionCard():View=card().apply {
-        addView(label("PLATFORM",11,Color.rgb(212,175,55),true))
-        addView(label("RSS Core: "+if(api.configured()) "configured" else "not configured",
-            13,Color.WHITE,false))
-        addView(label("RAY: server-side through RSS Core",13,Color.rgb(165,165,165),false))
-    }
-
-    private fun loadClipboard() {
-        val clip=clipboard.primaryClip ?: return
-        if(clip.itemCount==0) return
-        val value=clip.getItemAt(0).coerceToText(this).toString().trim()
-        if(value.startsWith("http://") || value.startsWith("https://")) socialUrl?.setText(value)
-    }
-
-    private fun card():LinearLayout=LinearLayout(this).apply {
-        orientation=LinearLayout.VERTICAL
-        setPadding(dp(16),dp(16),dp(16),dp(16))
-        background=GradientDrawable().apply {
-            setColor(Color.rgb(20,20,20))
-            setStroke(dp(1),Color.rgb(48,48,48))
-            cornerRadius=dp(16).toFloat()
+        Card(shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Quality", fontWeight = FontWeight.Bold)
+                if (movie.mediaOptions.isEmpty()) {
+                    Text("No authorized download options available.")
+                } else movie.mediaOptions.forEach { option ->
+                    Button(
+                        onClick = {
+                            api.createDownload(movie.requestId ?: movie.id, option.id) {
+                                if (it.isSuccess) Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Download, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("${option.format.uppercase()} • ${option.quality ?: "Available"}")
+                    }
+                }
+            }
         }
-        elevation=dp(2).toFloat()
-        layoutParams=LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,dp(6),0,dp(10)) }
     }
+}
 
-    private fun button(text:String,height:Int,action:()->Unit={}):TextView=TextView(this).apply {
-        this.text=text
-        textSize=13f
-        gravity=Gravity.CENTER
-        setTextColor(if(text.contains("●")) Color.rgb(212,175,55) else Color.WHITE)
-        background=GradientDrawable().apply {
-            setColor(Color.rgb(38,38,38))
-            setStroke(dp(1),Color.rgb(55,55,55))
-            cornerRadius=dp(12).toFloat()
+@Composable
+private fun SettingsContent(
+    prefs: android.content.SharedPreferences,
+    api: NativeHostApi,
+    onTheme: () -> Unit,
+    onAbout: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(shape = RoundedCornerShape(18.dp)) {
+            Column {
+                RssSettingRow(Icons.Default.Cloud, "RSS Core account", "Account and session")
+                Divider()
+                RssSettingRow(Icons.Default.Storage, "Download location", "Device storage")
+                Divider()
+                RssSettingRow(Icons.Default.Download, "Download history", "Queued and completed")
+            }
         }
-        isClickable=true
-        isFocusable=true
-        minHeight=dp(height)
-        setOnClickListener { action() }
+        Card(shape = RoundedCornerShape(18.dp)) {
+            Column {
+                RssSettingRow(Icons.Default.DarkMode, "Theme", prefs.getString("theme", "System default"), Modifier.clickable { onTheme() })
+                Divider()
+                RssSettingRow(Icons.Default.WorkspacePremium, "Premium", "RSS Core entitlement")
+                Divider()
+                RssSettingRow(Icons.Default.Cloud, "Connection", if (api.configured()) "RSS Core connected" else "Not configured")
+            }
+        }
+        Card(shape = RoundedCornerShape(18.dp)) {
+            Column {
+                RssSettingRow(Icons.Default.Info, "About", "RSS Downloader", Modifier.clickable { onAbout() })
+                Divider()
+                RssSettingRow(Icons.Default.Description, "Privacy Policy")
+                Divider()
+                RssSettingRow(Icons.Default.Description, "Terms & Conditions")
+            }
+        }
+        Text("${RssBrand.SHORT_NAME} • ${RssBrand.COMPANY_NAME}", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
     }
-
-    private fun label(text:String,size:Int,color:Int,bold:Boolean):TextView=TextView(this).apply {
-        this.text=text
-        textSize=size.toFloat()
-        setTextColor(color)
-        if(bold) typeface=android.graphics.Typeface.DEFAULT_BOLD
-    }
-
-    private fun divider():View=View(this).apply {
-        setBackgroundColor(Color.rgb(48,48,48))
-        layoutParams=LinearLayout.LayoutParams(-1,dp(1))
-    }
-
-    private fun dp(value:Int):Int=(value*resources.displayMetrics.density).toInt()
 }
