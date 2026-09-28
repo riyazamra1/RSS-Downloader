@@ -1,4 +1,10 @@
 <resources>
-    <!-- The Android launch splash is intentionally light so the first frame is clean even when the saved app appearance is dark. -->
-    <color name="splash_background">#F4F6FB</color>
+    <color name="rss_black">#090909</color>
+    <color name="rss_surface">#141414</color>
+    <color name="rss_surface_raised">#1C1C1C</color>
+    <color name="rss_gold">#D4AF37</color>
+    <color name="rss_text">#FFFFFF</color>
+    <color name="rss_text_secondary">#A5A5A5</color>
+    <color name="rss_divider">#303030</color>
+    <color name="splash_background">#090909</color>
 </resources>
