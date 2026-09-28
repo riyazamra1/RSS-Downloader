@@ -68,6 +68,16 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var themeDialog by remember { mutableStateOf(false) }
     var aboutDialog by remember { mutableStateOf(false) }
     var lastAnalyzed by remember { mutableStateOf("") }
+    var preview by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
+            if ((value.startsWith("http://") || value.startsWith("https://")) && value != url) url = value
+            kotlinx.coroutines.delay(700)
+        }
+    }
 
     DisposableEffect(Unit) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -89,7 +99,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             analysis = null
             analysisError = null
             api.analyze(url) { result ->
-                result.onSuccess { analysis = it }.onFailure { analysisError = it.message ?: "Analysis failed" }
+                result.onSuccess { analysis = it; preview = true }.onFailure { analysisError = it.message ?: "Analysis failed" }
             }
         }
     }
@@ -146,7 +156,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                 Column(Modifier.padding(16.dp)) {
                                     OutlinedTextField(
                                         value = url,
-                                        onValueChange = { url = it.trim() },
+                                        onValueChange = { url = it.trim(); lastAnalyzed = "" },
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true,
                                         leadingIcon = { Icon(Icons.Default.Link, null) },
@@ -154,16 +164,18 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                     )
                                     if (url.isNotBlank() && url.startsWith("http")) {
                                         Spacer(Modifier.height(8.dp))
-                                        Text(analysis?.title ?: analysisError ?: "Analyzing…")
+                                        Text(if (analysis != null) "Preview ready" else (analysisError ?: "Analyzing…"))
                                     }
                                 }
                             }
                         }
-                        analysis?.let { result ->
+                        if (preview) analysis?.let { result ->
                             item {
                                 Card(shape = RoundedCornerShape(20.dp)) {
                                     Column(Modifier.padding(16.dp)) {
+                                        Text("Preview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                         Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                        Text(result.normalizedUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         result.mediaOptions.forEach { option ->
                                             Button(
                                                 onClick = {
