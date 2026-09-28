@@ -1,231 +1,313 @@
 package com.riyaz.rssdownloader
 
-import android.app.AlertDialog
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 
-/**
- * RSS Downloader clean reset baseline.
- * The previous mixed UI implementation is intentionally removed.
- * Features are rebuilt only after each RSS KIT/Core/RAY stage is verified.
- */
 class MainActivity : AppCompatActivity() {
-    private val licensePrefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
+    private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
     private val api by lazy {
-        NativeHostApi(
-            BuildConfig.RSS_HOST_BASE_URL,
+        NativeHostApi(BuildConfig.RSS_HOST_BASE_URL,
             BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null },
-            licensePrefs.getString("app_key", null)
-        )
+            prefs.getString("app_key", null))
     }
     private val clipboard by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
+    private val handler = Handler(Looper.getMainLooper())
     private lateinit var content: LinearLayout
-    private lateinit var urlInput: EditText
-    private var currentTab = "social-downloader"
+    private var mainTab = 0
+    private var movieTab = 0
+    private var socialUrl: EditText? = null
+    private var pendingAnalyze: Runnable? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        buildShell()
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state)
+        buildRoot()
         loadClipboard()
     }
 
-    private fun buildShell() {
+    override fun onDestroy() {
+        pendingAnalyze?.let(handler::removeCallbacks)
+        handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
+    private fun buildRoot() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(10, 10, 10))
+            setBackgroundColor(Color.rgb(9,9,9))
         }
-        root.addView(topBar(), LinearLayout.LayoutParams(-1, dp(72)))
+        root.addView(header(), LinearLayout.LayoutParams(-1, dp(76)))
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(18))
+            setPadding(dp(16),dp(12),dp(16),dp(16))
         }
-        root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(bottomTabs(), LinearLayout.LayoutParams(-1, dp(72)))
+        root.addView(ScrollView(this).apply { isFillViewport=true; addView(content) },
+            LinearLayout.LayoutParams(-1,0,1f))
+        root.addView(mainNavigation(), LinearLayout.LayoutParams(-1,dp(72)))
         setContentView(root)
-        renderTab()
+        render()
     }
 
-    private fun topBar(): View = LinearLayout(this).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(16), dp(10), dp(16), dp(10))
+    private fun header(): View = LinearLayout(this).apply {
+        gravity=Gravity.CENTER_VERTICAL
+        setPadding(dp(16),dp(10),dp(16),dp(10))
         addView(ImageView(this@MainActivity).apply {
             setImageResource(R.drawable.rss_downloader_logo)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            contentDescription = "RSS Downloader"
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            scaleType=ImageView.ScaleType.FIT_CENTER
+            contentDescription="RSS Downloader"
+        },LinearLayout.LayoutParams(dp(50),dp(50)))
         addView(LinearLayout(this@MainActivity).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(text("RSS Downloader", 19, Color.WHITE, true))
-            addView(text("RSS KIT • RSS Core • RAY", 10, Color.rgb(165, 165, 165), false))
-        }, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(12), 0, dp(8), 0) })
-        addView(button("⚙", 42) {
-            Toast.makeText(this@MainActivity, "Settings will be rebuilt.", Toast.LENGTH_SHORT).show()
-        })
+            orientation=LinearLayout.VERTICAL
+            addView(label("RSS Downloader",20,Color.WHITE,true))
+            addView(label("RSS KIT  •  RSS Core  •  RAY",10,Color.rgb(165,165,165),false))
+        },LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(dp(12),0,0,0) })
     }
 
-    private fun bottomTabs(): View = LinearLayout(this).apply {
-        setPadding(dp(10), dp(8), dp(10), dp(10))
-        setBackgroundColor(Color.rgb(18, 18, 18))
-        val tabs = listOf(
-            "social-downloader" to "Social",
-            "tamil-movies" to "Tamil",
-            "tamil-dubbed-movies" to "Dubbed"
-        )
-        tabs.forEach { tab ->
-            addView(button(tab.second, 52) {
-                currentTab = tab.first
-                renderTab()
-            }, LinearLayout.LayoutParams(0, dp(52), 1f).apply {
-                setMargins(dp(3), 0, dp(3), 0)
-            })
+    private fun mainNavigation(): View = LinearLayout(this).apply {
+        setPadding(dp(8),dp(7),dp(8),dp(9))
+        setBackgroundColor(Color.rgb(18,18,18))
+        listOf("Social Downloader","Movie","Settings").forEachIndexed { index,name ->
+            addView(button(name,54) { mainTab=index; render() },
+                LinearLayout.LayoutParams(0,dp(54),1f).apply { setMargins(dp(3),0,dp(3),0) })
         }
     }
 
-    private fun renderTab() {
+    private fun render() {
         content.removeAllViews()
-        val title = when (currentTab) {
-            "social-downloader" -> "Social Downloader"
-            "tamil-movies" -> "Tamil Movies"
-            else -> "Tamil Dubbed Movies"
+        when(mainTab) {
+            0 -> renderSocial()
+            1 -> renderMovie()
+            else -> renderSettings()
         }
-        content.addView(text(title, 27, Color.WHITE, true))
-        content.addView(text("RSS Downloader → RSS Core → RAY", 12, Color.rgb(180, 180, 180), false).apply {
-            setPadding(0, dp(5), 0, dp(18))
-        })
-        if (currentTab == "social-downloader") renderSocial() else renderMovies()
     }
 
     private fun renderSocial() {
-        val card = card()
-        card.addView(text("SOCIAL DOWNLOAD", 11, Color.rgb(212, 175, 55), true))
-        card.addView(text("Paste a supported URL and send it to RSS Core for analysis.", 15, Color.WHITE, false).apply {
-            setPadding(0, dp(8), 0, dp(14))
-        })
-        urlInput = EditText(this).apply {
-            hint = "Paste URL here…"
-            setHintTextColor(Color.rgb(120, 120, 120))
+        content.addView(label("Social Downloader",28,Color.WHITE,true))
+        content.addView(label("Copy or paste a supported URL. Analysis starts automatically.",
+            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(16)) })
+        val card=card()
+        card.addView(label("DOWNLOAD",11,Color.rgb(212,175,55),true))
+        val input=EditText(this).apply {
+            hint="Paste URL here"
+            setHintTextColor(Color.rgb(115,115,115))
             setTextColor(Color.WHITE)
-            textSize = 15f
-            singleLine = true
-            setPadding(dp(14), 0, dp(14), 0)
-            setBackgroundColor(Color.rgb(28, 28, 28))
+            textSize=15f
+            singleLine=true
+            setPadding(dp(14),0,dp(14),0)
+            setBackgroundColor(Color.rgb(28,28,28))
         }
-        card.addView(urlInput, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(10) })
-        val actions = LinearLayout(this).apply {
-            addView(button("Paste", 48) { loadClipboard() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-            addView(button("Analyze", 48) { analyze() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-                setMargins(dp(8), 0, 0, 0)
-            })
-        }
-        card.addView(actions)
+        socialUrl=input
+        card.addView(input,LinearLayout.LayoutParams(-1,dp(54)))
+        card.addView(label("No Analyze button — valid URLs are analyzed automatically.",
+            12,Color.rgb(155,155,155),false).apply { setPadding(0,dp(8),0,0) })
         content.addView(card)
+        input.addTextChangedListener(object: android.text.TextWatcher {
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) {
+                scheduleAnalysis(s.toString())
+            }
+            override fun afterTextChanged(s:android.text.Editable?){}
+        })
         content.addView(connectionCard())
     }
 
-    private fun renderMovies() {
-        val card = card()
-        card.addView(text("MOVIE SEARCH", 11, Color.rgb(212, 175, 55), true))
-        val query = EditText(this).apply {
-            hint = "Search movies…"
-            setHintTextColor(Color.rgb(120, 120, 120))
-            setTextColor(Color.WHITE)
-            textSize = 15f
-            singleLine = true
-            setPadding(dp(14), 0, dp(14), 0)
-            setBackgroundColor(Color.rgb(28, 28, 28))
-        }
-        card.addView(query, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
-        card.addView(button("Search", 48) { searchMovies(query.text.toString()) }.apply {
-            layoutParams = LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10) }
-        })
-        content.addView(card)
-        content.addView(connectionCard())
+    private fun scheduleAnalysis(value:String) {
+        pendingAnalyze?.let(handler::removeCallbacks)
+        val url=value.trim()
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        pendingAnalyze=Runnable { analyze(url) }
+        handler.postDelayed(pendingAnalyze!!,650)
     }
 
-    private fun connectionCard(): View = card().apply {
-        addView(text("PLATFORM CONNECTION", 11, Color.rgb(212, 175, 55), true))
-        addView(text("RSS Core: " + if (api.configured()) "configured" else "not configured", 13, Color.WHITE, false).apply {
-            setPadding(0, dp(9), 0, dp(3))
-        })
-        addView(text("RAY: reached server-side through RSS Core", 13, Color.rgb(180, 180, 180), false))
+    private fun analyze(url:String) {
+        if(mainTab!=0 || socialUrl?.text.toString().trim()!=url) return
+        val loading=label("Analyzing…",13,Color.rgb(212,175,55),false)
+        content.addView(loading)
+        api.analyze(url) { result ->
+            runOnUiThread {
+                if(loading.parent===content) content.removeView(loading)
+                result.onSuccess { a ->
+                    val card=card()
+                    card.addView(label(a.title,18,Color.WHITE,true))
+                    if(a.mediaOptions.isEmpty()) {
+                        card.addView(label("No downloadable format returned.",13,Color.rgb(180,180,180),false))
+                    } else {
+                        a.mediaOptions.forEach { option ->
+                            val quality=option.quality ?: "Available"
+                            val text=option.format.uppercase()+" • "+quality
+                            card.addView(button(text,48) {
+                                api.createDownload(a.requestId,option.id) { r ->
+                                    runOnUiThread {
+                                        r.onSuccess { Toast.makeText(this,"Download queued.",Toast.LENGTH_SHORT).show() }
+                                            .onFailure { Toast.makeText(this,it.message ?: "Download failed.",Toast.LENGTH_LONG).show() }
+                                    }
+                                }
+                            },LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(7) })
+                        }
+                    }
+                    content.addView(card)
+                }.onFailure { error ->
+                    content.addView(label("Analysis failed: "+(error.message ?: "Unknown error"),
+                        12,Color.rgb(220,120,120),false))
+                }
+            }
+        }
+    }
+
+    private fun renderMovie() {
+        content.addView(label("Movie",28,Color.WHITE,true))
+        val sub=LinearLayout(this)
+        sub.addView(button("Tamil",46) { movieTab=0; render() },LinearLayout.LayoutParams(0,dp(46),1f))
+        sub.addView(button("Dubbed",46) { movieTab=1; render() },
+            LinearLayout.LayoutParams(0,dp(46),1f).apply { leftMargin=dp(6) })
+        content.addView(sub)
+        val search=EditText(this).apply {
+            hint="Search movies"
+            setHintTextColor(Color.rgb(115,115,115))
+            setTextColor(Color.WHITE)
+            textSize=15f
+            singleLine=true
+            setPadding(dp(14),0,dp(14),0)
+            setBackgroundColor(Color.rgb(28,28,28))
+        }
+        content.addView(search,LinearLayout.LayoutParams(-1,dp(52)).apply { topMargin=dp(14) })
+        content.addView(button("Search",48) { loadMovies(search.text.toString()) },
+            LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(8) })
+        loadMovies("")
+    }
+
+    private fun loadMovies(query:String) {
+        val loading=label("Loading pre-loaded movies from RSS Core…",13,Color.rgb(212,175,55),false)
+        content.addView(loading)
+        val tab=if(movieTab==0) "tamil-movies" else "tamil-dubbed-movies"
+        api.search(tab,query) { result ->
+            runOnUiThread {
+                if(loading.parent===content) content.removeView(loading)
+                result.onSuccess { movies ->
+                    val card=card()
+                    card.addView(label(if(query.isBlank()) "Available movies" else "Search results",
+                        11,Color.rgb(212,175,55),true))
+                    movies.forEach { movie ->
+                        val row=LinearLayout(this).apply {
+                            orientation=LinearLayout.VERTICAL
+                            setPadding(0,dp(12),0,dp(12))
+                        }
+                        row.addView(label(movie.title,16,Color.WHITE,true))
+                        val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate).joinToString(" • ")
+                        if(meta.isNotBlank()) row.addView(label(meta,12,Color.rgb(160,160,160),false))
+                        row.setOnClickListener { showMovie(movie) }
+                        card.addView(row)
+                        card.addView(divider())
+                    }
+                    if(movies.isEmpty()) card.addView(label("No movies returned from the configured real source.",
+                        13,Color.rgb(180,180,180),false))
+                    content.addView(card)
+                }.onFailure { error ->
+                    content.addView(label("Movie source error: "+(error.message ?: "Unknown error"),
+                        12,Color.rgb(220,120,120),false))
+                }
+            }
+        }
+    }
+
+    private fun showMovie(movie:NativeHostApi.SearchResult) {
+        content.removeAllViews()
+        content.addView(label("Movie Details",26,Color.WHITE,true))
+        val card=card()
+        card.addView(label(movie.title,21,Color.WHITE,true))
+        val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate,movie.runtime,movie.director)
+            .joinToString(" • ")
+        if(meta.isNotBlank()) card.addView(label(meta,12,Color.rgb(165,165,165),false))
+        movie.synopsis?.takeIf { it.isNotBlank() }?.let {
+            card.addView(label(it,13,Color.rgb(205,205,205),false).apply { setPadding(0,dp(12),0,0) })
+        }
+        card.addView(label("Quality / authorized download",12,Color.rgb(212,175,55),true)
+            .apply { setPadding(0,dp(16),0,dp(6)) })
+        movie.mediaOptions.forEach { option ->
+            card.addView(button(option.format.uppercase()+" • "+(option.quality ?: "Available"),48) {
+                api.createDownload(movie.requestId ?: movie.id,option.id) { r ->
+                    runOnUiThread {
+                        r.onSuccess { Toast.makeText(this,"Download queued.",Toast.LENGTH_SHORT).show() }
+                            .onFailure { Toast.makeText(this,it.message ?: "Download failed.",Toast.LENGTH_LONG).show() }
+                    }
+                }
+            },LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(7) })
+        }
+        if(movie.mediaOptions.isEmpty()) card.addView(label("No authorized download options returned by RSS Core.",
+            13,Color.rgb(180,180,180),false))
+        content.addView(card)
+        content.addView(button("Back to Movie",48) { render() },
+            LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(12) })
+    }
+
+    private fun renderSettings() {
+        content.addView(label("Settings",28,Color.WHITE,true))
+        listOf(
+            "Account" to "RSS Core account and session",
+            "Downloads" to "Download location and history",
+            "Appearance" to "Light / Dark / System",
+            "Notifications" to "Download and account notifications",
+            "Premium" to "RSS Core Premium",
+            "About" to "RSS Downloader information",
+            "Privacy Policy" to "Privacy information",
+            "Terms & Conditions" to "Terms information"
+        ).forEach { item ->
+            val row=card()
+            row.addView(label(item.first,16,Color.WHITE,true))
+            row.addView(label(item.second,12,Color.rgb(165,165,165),false).apply { setPadding(0,dp(5),0,0) })
+            content.addView(row)
+        }
+    }
+
+    private fun connectionCard():View=card().apply {
+        addView(label("PLATFORM",11,Color.rgb(212,175,55),true))
+        addView(label("RSS Core: "+if(api.configured()) "configured" else "not configured",
+            13,Color.WHITE,false))
+        addView(label("RAY: server-side through RSS Core",13,Color.rgb(165,165,165),false))
     }
 
     private fun loadClipboard() {
-        val clip = clipboard.primaryClip ?: return
-        if (clip.itemCount == 0) return
-        val value = clip.getItemAt(0).coerceToText(this).toString().trim()
-        if (value.startsWith("http://") || value.startsWith("https://")) {
-            if (::urlInput.isInitialized) urlInput.setText(value)
-        }
+        val clip=clipboard.primaryClip ?: return
+        if(clip.itemCount==0) return
+        val value=clip.getItemAt(0).coerceToText(this).toString().trim()
+        if(value.startsWith("http://") || value.startsWith("https://")) socialUrl?.setText(value)
     }
 
-    private fun analyze() {
-        val value = urlInput.text.toString().trim()
-        if (value.isBlank()) {
-            toast("Paste a URL first.")
-            return
-        }
-        toast("Analyzing through RSS Core…")
-        api.analyze(value) { result ->
-            runOnUiThread {
-                result.onSuccess { analysis ->
-                    AlertDialog.Builder(this)
-                        .setTitle(analysis.title.ifBlank { "RSS Download" })
-                        .setMessage(
-                            "RSS Core response received.\\n\\nRequest ID: " +
-                                analysis.requestId.ifBlank { "not returned" } +
-                                "\\nAvailable formats: " + analysis.mediaOptions.size
-                        )
-                        .setPositiveButton("OK", null)
-                        .show()
-                }.onFailure { toast(it.message ?: "RSS Core analysis failed.") }
-            }
-        }
+    private fun card():LinearLayout=LinearLayout(this).apply {
+        orientation=LinearLayout.VERTICAL
+        setPadding(dp(16),dp(16),dp(16),dp(16))
+        setBackgroundColor(Color.rgb(20,20,20))
+        layoutParams=LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,dp(6),0,dp(10)) }
     }
 
-    private fun searchMovies(query: String) {
-        toast("Searching through RSS Core…")
-        api.search(currentTab, query.trim()) { result ->
-            runOnUiThread {
-                result.onSuccess { items ->
-                    toast(items.size.toString() + " result(s) received.")
-                }.onFailure { toast(it.message ?: "RSS Core search failed.") }
-            }
-        }
-    }
-
-    private fun card() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(16), dp(16), dp(16), dp(16))
-        setBackgroundColor(Color.rgb(20, 20, 20))
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }
-    }
-
-    private fun text(value: String, size: Int, color: Int, bold: Boolean) = TextView(this).apply {
-        text = value
-        textSize = size.toFloat()
-        setTextColor(color)
-        typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-    }
-
-    private fun button(label: String, height: Int, action: () -> Unit) = TextView(this).apply {
-        text = label
-        textSize = 13f
+    private fun button(text:String,height:Int,action:()->Unit={}):TextView=TextView(this).apply {
+        this.text=text
+        textSize=13f
+        gravity=Gravity.CENTER
         setTextColor(Color.WHITE)
-        gravity = Gravity.CENTER
-        typeface = Typeface.DEFAULT_BOLD
-        setBackgroundColor(Color.rgb(32, 32, 32))
-        minHeight = dp(height)
+        setBackgroundColor(Color.rgb(38,38,38))
+        isClickable=true
         setOnClickListener { action() }
     }
 
-    private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun label(text:String,size:Int,color:Int,bold:Boolean):TextView=TextView(this).apply {
+        this.text=text
+        textSize=size.toFloat()
+        setTextColor(color)
+        if(bold) typeface=android.graphics.Typeface.DEFAULT_BOLD
+    }
+
+    private fun divider():View=View(this).apply {
+        setBackgroundColor(Color.rgb(48,48,48))
+        layoutParams=LinearLayout.LayoutParams(-1,dp(1))
+    }
+
+    private fun dp(value:Int):Int=(value*resources.displayMetrics.density).toInt()
 }
