@@ -65,7 +65,11 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         }
         if (prefs.getBoolean("registered", false)) {
             if (prefs.getBoolean("email_verified", false)) {
-                if (prefs.getBoolean("onboarding_complete", false)) openApp() else showOnboarding()
+                if (prefs.getBoolean("onboarding_complete", false)) {
+                    sendReturningSession()
+                } else {
+                    showOnboarding()
+                }
             } else {
                 showVerification()
                 checkVerification()
@@ -357,6 +361,34 @@ class LicenseOnboardingActivity : AppCompatActivity() {
             card.addView(skip,LinearLayout.LayoutParams(-1,42.dp()).apply{topMargin=4.dp()})
         }
         attach()
+    }
+
+    private fun sendReturningSession() {
+        val emailValue=prefs.getString("email","").orEmpty()
+        val appKey=prefs.getString("app_key","").orEmpty()
+        val projectKey="rss-downloader"
+        if(emailValue.isBlank() || appKey.isBlank()) { openApp(); return }
+        executor.execute {
+            runCatching {
+                val body=JSONObject().apply {
+                    put("email",emailValue)
+                    put("project_key",projectKey)
+                    put("device_id",deviceId())
+                    put("app_key",appKey)
+                }.toString()
+                val c=URL(BuildConfig.RSS_HOST_BASE_URL.trimEnd('/')+"/api/v1/license/session").openConnection() as HttpURLConnection
+                try {
+                    c.requestMethod="POST"; c.connectTimeout=12000; c.readTimeout=15000; c.doOutput=true; c.useCaches=false
+                    c.setRequestProperty("Content-Type","application/json")
+                    c.setRequestProperty("Accept","application/json")
+                    c.setRequestProperty("X-RSS-App-Id","rss-downloader")
+                    c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                    val code=c.responseCode
+                    if(code !in 200..299) throw IllegalStateException("RSS Core session unavailable (HTTP $code)")
+                } finally { c.disconnect() }
+            }
+            runOnUiThread { openApp() }
+        }
     }
 
     private fun openApp(){startActivity(android.content.Intent(this,MainActivity::class.java));finish()}
