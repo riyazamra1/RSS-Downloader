@@ -1,42 +1,59 @@
 # RSS Downloader
 
-RSS Downloader is a responsive downloader application built around the RSS Core + RAY architecture.
+## RESET BASELINE — 2026-09-28
 
-## Approved UI direction
+RSS Downloader has been intentionally reset to **0% implementation status**.
 
-The approved RSS Downloader interface is preserved as the source design. The implementation must not replace or substantially redesign it. New functionality is integrated into the existing visual language and interaction model.
+The previous UI/feature implementation is no longer treated as completed work. Existing code may remain in history for reference, but no previous feature is counted as complete.
 
-### Core interface requirements
+### Rebuild order
 
-- 3 rearrangeable tabs:
-  1. Social Downloader
-  2. Tamil Movies
-  3. Tamil Dubbed Movies
-- Social Downloader:
-  - Clipboard URL auto-detection/paste
-  - Automatic URL analysis
-  - Media preview
-  - Audio/video format selection
-  - Animated download state
-- Tamil Movies:
-  - Search button and search flow inside the tab
-  - Movie -> quality -> authorized download flow
-- Tamil Dubbed Movies:
-  - Search button and search flow inside the tab
-  - Movie -> quality -> authorized download flow
-- Tab order is persisted after rearranging.
-- Responsive mobile/tablet/desktop layout.
-- Light/dark appearance support.
-- Existing approved visual design remains unchanged.
+1. **RSS KIT UI foundation**
+   - Project logo and app identity
+   - Splash → Registration → Welcome → App Features → Main App
+   - Light / Dark / System
+   - Typography, spacing, surfaces, icons, animation and responsive layout
+   - Clean slide navigation
+   - Settings / About / Contact / Privacy / Terms
 
-## Architecture
+2. **RSS Core account**
+   - Email registration
+   - Google/Gmail sign-in
+   - Mandatory Terms acceptance
+   - Verification and 24-hour expiry
+   - Welcome / Welcome Back email behavior
+   - Persistent RSS Core account/session
+   - Cloud and multi-device account state
 
-`RSS Downloader UI -> RSS Core -> RAY -> Downloader/Provider adapters`
+3. **RSS Core ↔ RAY**
+   - RSS Core is the control plane
+   - RAY is the server-side execution worker
+   - Android never receives RAY secrets
+   - Every endpoint is live-tested before being marked complete
 
-RSS Core owns orchestration, validation, queue/state, provider selection and policy. RAY executes jobs and reports progress/results. The UI communicates with RSS Core through the project API boundary rather than directly controlling workers.
+4. **Downloader**
+   - Social Downloader
+   - Tamil Movies
+   - Tamil Dubbed Movies
+   - Search inside movie tabs
+   - URL clipboard detection
+   - Analysis → media options → authorized download
+   - Progress, queue, cancellation and device save
 
-## Project status
+5. **Premium**
+   - RSS Core entitlement
+   - Payments.lk target
+   - No initial Play Billing implementation
 
-Repository connected: `riyazamra1/RSS-Downloader`.
+### Source of truth
 
-Initial implementation is now being established in this repository. UI preservation is a hard requirement.
+- Project repository: riyazamra1/RSS-Downloader
+- RSS KIT: riyazamra1/RSS-Brand-Kit
+- RSS Core: https://rsscore.cv
+- RAY: server-side behind RSS Core
+
+### Status policy
+
+No build, deployment, test, API connection, email delivery, or feature is considered successful until it is actually verified.
+
+**Current rebuild status: 0%.**
