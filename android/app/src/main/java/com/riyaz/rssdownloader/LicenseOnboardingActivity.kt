@@ -66,7 +66,7 @@ class LicenseOnboardingActivity : AppCompatActivity() {
         if (prefs.getBoolean("registered", false)) {
             if (prefs.getBoolean("email_verified", false)) {
                 if (prefs.getBoolean("onboarding_complete", false)) {
-                    openApp()
+                    sendReturningSession()
                 } else {
                     showOnboarding()
                 }
@@ -366,13 +366,12 @@ class LicenseOnboardingActivity : AppCompatActivity() {
     private fun sendReturningSession() {
         val emailValue=prefs.getString("email","").orEmpty()
         val appKey=prefs.getString("app_key","").orEmpty()
-        val projectKey="rss-downloader"
         if(emailValue.isBlank() || appKey.isBlank()) { openApp(); return }
         executor.execute {
-            runCatching {
+            val result=runCatching {
                 val body=JSONObject().apply {
                     put("email",emailValue)
-                    put("project_key",projectKey)
+                    put("project_key","rss-downloader")
                     put("device_id",deviceId())
                     put("app_key",appKey)
                 }.toString()
@@ -384,10 +383,26 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                     c.setRequestProperty("X-RSS-App-Id","rss-downloader")
                     c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                     val code=c.responseCode
-                    if(code !in 200..299) throw IllegalStateException("RSS Core session unavailable (HTTP $code)")
+                    val stream=if(code in 200..299)c.inputStream else c.errorStream
+                    val response=stream?.bufferedReader()?.use{it.readText()}.orEmpty()
+                    if(code !in 200..299) error(JSONObject(response).optString("error").ifBlank{"RSS Core session unavailable (HTTP $code)"})
+                    JSONObject(response)
                 } finally { c.disconnect() }
             }
-            runOnUiThread { openApp() }
+            runOnUiThread {
+                result.onSuccess { json ->
+                    val license=json.optJSONObject("license")
+                    prefs.edit()
+                        .putBoolean("email_verified",json.optBoolean("email_verified",true))
+                        .putString("plan",license?.optString("plan").orEmpty())
+                        .putString("license_status",license?.optString("status").orEmpty())
+                        .apply()
+                    openApp()
+                }.onFailure { error ->
+                    Toast.makeText(this,error.message ?: "Unable to restore RSS Core session.",Toast.LENGTH_LONG).show()
+                    openApp()
+                }
+            }
         }
     }
 
