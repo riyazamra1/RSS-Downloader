@@ -203,31 +203,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadMovies(query:String) {
-        val loading=label("Loading pre-loaded movies from RSS Core…",13,Color.rgb(212,175,55),false)
+        val loading=label("Loading catalogue…",13,Color.rgb(212,175,55),false)
         content.addView(loading)
         val tab=if(movieTab==0) "tamil-movies" else "tamil-dubbed-movies"
         api.search(tab,query) { result ->
             runOnUiThread {
                 if(loading.parent===content) content.removeView(loading)
                 result.onSuccess { movies ->
-                    val card=card()
-                    card.addView(label(if(query.isBlank()) "Available movies" else "Search results",
+                    val section=card()
+                    section.addView(label(if(query.isBlank()) "AVAILABLE MOVIES" else "SEARCH RESULTS",
                         11,Color.rgb(212,175,55),true))
-                    movies.forEach { movie ->
+                    if(movies.isEmpty()) {
+                        section.addView(label("No movies returned from the configured source.",
+                            13,Color.rgb(180,180,180),false).apply { setPadding(0,dp(10),0,dp(0)) })
+                    } else movies.forEachIndexed { index,movie ->
                         val row=LinearLayout(this).apply {
                             orientation=LinearLayout.VERTICAL
-                            setPadding(0,dp(12),0,dp(12))
+                            setPadding(dp(2),dp(13),dp(2),dp(13))
+                            isClickable=true
+                            isFocusable=true
                         }
-                        row.addView(label(movie.title,16,Color.WHITE,true))
-                        val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate).joinToString(" • ")
-                        if(meta.isNotBlank()) row.addView(label(meta,12,Color.rgb(160,160,160),false))
+                        row.addView(label(movie.title,17,Color.WHITE,true))
+                        val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate)
+                            .joinToString(" • ")
+                        if(meta.isNotBlank()) row.addView(label(meta,12,Color.rgb(160,160,160),false)
+                            .apply { setPadding(0,dp(5),0,0) })
+                        row.addView(label("View details  ›",12,Color.rgb(212,175,55),false)
+                            .apply { setPadding(0,dp(7),0,dp(0)) })
                         row.setOnClickListener { showMovie(movie) }
-                        card.addView(row)
-                        card.addView(divider())
+                        section.addView(row)
+                        if(index < movies.lastIndex) section.addView(divider())
                     }
-                    if(movies.isEmpty()) card.addView(label("No movies returned from the configured real source.",
-                        13,Color.rgb(180,180,180),false))
-                    content.addView(card)
+                    content.addView(section)
                 }.onFailure { error ->
                     content.addView(label("Movie source error: "+(error.message ?: "Unknown error"),
                         12,Color.rgb(220,120,120),false))
@@ -239,30 +246,46 @@ class MainActivity : AppCompatActivity() {
     private fun showMovie(movie:NativeHostApi.SearchResult) {
         content.removeAllViews()
         content.addView(label("Movie Details",26,Color.WHITE,true))
-        val card=card()
-        card.addView(label(movie.title,21,Color.WHITE,true))
+        content.addView(label("Review the movie information and choose an available quality.",
+            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
+
+        val info=card()
+        info.addView(label(movie.title,21,Color.WHITE,true))
         val meta=listOfNotNull(movie.year?.toString(),movie.language,movie.releaseDate,movie.runtime,movie.director)
             .joinToString(" • ")
-        if(meta.isNotBlank()) card.addView(label(meta,12,Color.rgb(165,165,165),false))
+        if(meta.isNotBlank()) info.addView(label(meta,12,Color.rgb(165,165,165),false)
+            .apply { setPadding(0,dp(6),0,dp(0)) })
         movie.synopsis?.takeIf { it.isNotBlank() }?.let {
-            card.addView(label(it,13,Color.rgb(205,205,205),false).apply { setPadding(0,dp(12),0,0) })
+            info.addView(label(it,13,Color.rgb(205,205,205),false).apply {
+                setPadding(0,dp(14),0,dp(0))
+            })
         }
-        card.addView(label("Quality / authorized download",12,Color.rgb(212,175,55),true)
-            .apply { setPadding(0,dp(16),0,dp(6)) })
-        movie.mediaOptions.forEach { option ->
-            card.addView(button(option.format.uppercase()+" • "+(option.quality ?: "Available"),48) {
-                api.createDownload(movie.requestId ?: movie.id,option.id) { r ->
-                    runOnUiThread {
-                        r.onSuccess { Toast.makeText(this,"Download queued.",Toast.LENGTH_SHORT).show() }
-                            .onFailure { Toast.makeText(this,it.message ?: "Download failed.",Toast.LENGTH_LONG).show() }
+        content.addView(info)
+
+        val quality=card()
+        quality.addView(label("AVAILABLE QUALITY",11,Color.rgb(212,175,55),true))
+        if(movie.mediaOptions.isEmpty()) {
+            quality.addView(label("No authorized download options are currently available.",
+                13,Color.rgb(180,180,180),false).apply { setPadding(0,dp(9),0,dp(0)) })
+        } else {
+            movie.mediaOptions.forEach { option ->
+                val qualityName=(option.quality ?: "Available").uppercase()
+                val formatName=option.format.uppercase()
+                quality.addView(button("$formatName  •  $qualityName",50) {
+                    api.createDownload(movie.requestId ?: movie.id,option.id) { r ->
+                        runOnUiThread {
+                            r.onSuccess {
+                                Toast.makeText(this,"Download queued.",Toast.LENGTH_SHORT).show()
+                            }.onFailure {
+                                Toast.makeText(this,it.message ?: "Download failed.",Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
-                }
-            },LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(7) })
+                },LinearLayout.LayoutParams(-1,dp(50)).apply { topMargin=dp(8) })
+            }
         }
-        if(movie.mediaOptions.isEmpty()) card.addView(label("No authorized download options returned by RSS Core.",
-            13,Color.rgb(180,180,180),false))
-        content.addView(card)
-        content.addView(button("Back to Movie",48) { render() },
+        content.addView(quality)
+        content.addView(button("Back to Movies",48) { render() },
             LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(12) })
     }
 
