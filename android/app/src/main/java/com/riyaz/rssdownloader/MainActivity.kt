@@ -3,6 +3,7 @@ package com.riyaz.rssdownloader
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -28,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingAnalyze: Runnable? = null
 
     override fun onCreate(state: Bundle?) {
+        applyTheme(prefs.getString("theme","System default") ?: "System default")
         super.onCreate(state)
         buildRoot()
         loadClipboard()
@@ -380,9 +382,19 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Appearance")
             .setSingleChoiceItems(options, options.indexOf(current).coerceAtLeast(0)) { dialog, which ->
                 prefs.edit().putString("theme",options[which]).apply()
-                Toast.makeText(this,"Theme preference saved.",Toast.LENGTH_SHORT).show()
+                applyTheme(options[which])
                 dialog.dismiss()
             }.show()
+    }
+
+    private fun applyTheme(theme:String) {
+        val mode = when(theme) {
+            "Light" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+            "Dark" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+            else -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        if(androidx.appcompat.app.AppCompatDelegate.getDefaultNightMode()!=mode)
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(mode)
     }
 
     private fun connectionCard():View=card().apply {
@@ -402,7 +414,12 @@ class MainActivity : AppCompatActivity() {
     private fun card():LinearLayout=LinearLayout(this).apply {
         orientation=LinearLayout.VERTICAL
         setPadding(dp(16),dp(16),dp(16),dp(16))
-        setBackgroundColor(Color.rgb(20,20,20))
+        background=GradientDrawable().apply {
+            setColor(Color.rgb(20,20,20))
+            setStroke(dp(1),Color.rgb(48,48,48))
+            cornerRadius=dp(16).toFloat()
+        }
+        elevation=dp(2).toFloat()
         layoutParams=LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,dp(6),0,dp(10)) }
     }
 
@@ -410,9 +427,15 @@ class MainActivity : AppCompatActivity() {
         this.text=text
         textSize=13f
         gravity=Gravity.CENTER
-        setTextColor(Color.WHITE)
-        setBackgroundColor(Color.rgb(38,38,38))
+        setTextColor(if(text.contains("●")) Color.rgb(212,175,55) else Color.WHITE)
+        background=GradientDrawable().apply {
+            setColor(Color.rgb(38,38,38))
+            setStroke(dp(1),Color.rgb(55,55,55))
+            cornerRadius=dp(12).toFloat()
+        }
         isClickable=true
+        isFocusable=true
+        minHeight=dp(height)
         setOnClickListener { action() }
     }
 
