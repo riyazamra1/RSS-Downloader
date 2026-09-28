@@ -84,7 +84,7 @@ class MainActivity : AppCompatActivity() {
             setHintTextColor(Color.rgb(115,115,115))
             setTextColor(Color.WHITE)
             textSize=15f
-            singleLine=true
+            maxLines=1
             setPadding(dp(14),0,dp(14),0)
             setBackgroundColor(Color.rgb(28,28,28))
             setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_share,0,0,0)
@@ -180,7 +180,7 @@ class MainActivity : AppCompatActivity() {
             setHintTextColor(Color.rgb(115,115,115))
             setTextColor(Color.WHITE)
             textSize=15f
-            singleLine=true
+            maxLines=1
             setPadding(dp(14),0,dp(14),0)
             setBackgroundColor(Color.rgb(28,28,28))
             imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
