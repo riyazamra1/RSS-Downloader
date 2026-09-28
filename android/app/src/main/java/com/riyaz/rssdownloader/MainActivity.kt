@@ -291,21 +291,49 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderSettings() {
         content.addView(label("Settings",28,Color.WHITE,true))
-        listOf(
-            "Account" to "RSS Core account and session",
-            "Downloads" to "Download location and history",
-            "Appearance" to "Light / Dark / System",
-            "Notifications" to "Download and account notifications",
-            "Premium" to "RSS Core Premium",
-            "About" to "RSS Downloader information",
-            "Privacy Policy" to "Privacy information",
-            "Terms & Conditions" to "Terms information"
-        ).forEach { item ->
-            val row=card()
-            row.addView(label(item.first,16,Color.WHITE,true))
-            row.addView(label(item.second,12,Color.rgb(165,165,165),false).apply { setPadding(0,dp(5),0,0) })
-            content.addView(row)
-        }
+        content.addView(label("RSS Downloader preferences and account controls.",
+            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
+
+        val account=card()
+        account.addView(label("ACCOUNT",11,Color.rgb(212,175,55),true))
+        account.addView(label("RSS Core account",16,Color.WHITE,true).apply { setPadding(0,dp(8),0,dp(2)) })
+        account.addView(label("Registration, verification and session status",12,Color.rgb(165,165,165),false))
+        account.addView(button("Manage Account  ›",46) {
+            Toast.makeText(this,"Account management will use the RSS Core session.",Toast.LENGTH_SHORT).show()
+        },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
+        content.addView(account)
+
+        val downloads=card()
+        downloads.addView(label("DOWNLOADS",11,Color.rgb(212,175,55),true))
+        downloads.addView(settingsRow("Download location","Choose where completed files are saved"))
+        downloads.addView(settingsRow("Download history","View completed and queued downloads"))
+        content.addView(downloads)
+
+        val appearance=card()
+        appearance.addView(label("APPEARANCE",11,Color.rgb(212,175,55),true))
+        appearance.addView(settingsRow("Theme","Light / Dark / System"))
+        appearance.addView(settingsRow("Interface","RSS KIT visual system"))
+        content.addView(appearance)
+
+        val service=card()
+        service.addView(label("RSS SERVICES",11,Color.rgb(212,175,55),true))
+        service.addView(settingsRow("Premium","Premium entitlement is controlled by RSS Core"))
+        service.addView(settingsRow("Connection","RSS Core control plane • RAY server-side"))
+        content.addView(service)
+
+        val information=card()
+        information.addView(label("INFORMATION",11,Color.rgb(212,175,55),true))
+        information.addView(settingsRow("About","RSS Downloader information"))
+        information.addView(settingsRow("Privacy Policy","Privacy information"))
+        information.addView(settingsRow("Terms & Conditions","Terms information"))
+        content.addView(information)
+    }
+
+    private fun settingsRow(title:String,subtitle:String):View=LinearLayout(this).apply {
+        orientation=LinearLayout.VERTICAL
+        setPadding(dp(2),dp(12),dp(2),dp(12))
+        addView(label(title,15,Color.WHITE,true))
+        addView(label(subtitle,12,Color.rgb(165,165,165),false).apply { setPadding(0,dp(4),0,0) })
     }
 
     private fun connectionCard():View=card().apply {
