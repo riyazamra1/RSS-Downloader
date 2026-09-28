@@ -23,7 +23,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     fun analyze(url: String, callback: (Result<Analysis>) -> Unit) = executor.execute {
         callback(runCatching {
             val json = requestObject("/api/downloader/analyze", "POST", JSONObject().put("url", url))
-            Analysis(json.optString("requestId"), json.optString("title", "RSS Download"), json.optString("normalizedUrl", url), json.optString("thumbnailUrl", "").ifBlank { null }, mediaOptions(json.optJSONArray("mediaOptions")))
+            Analysis(json.optString("requestId").ifBlank { json.optString("id") }, json.optString("title", "RSS Download"), json.optString("normalizedUrl", url), json.optString("thumbnailUrl", "").ifBlank { null }, mediaOptions(json.optJSONArray("mediaOptions") ?: json.optJSONArray("downloadOptions") ?: json.optJSONArray("formats") ?: json.optJSONArray("options")))
         })
     }
 
