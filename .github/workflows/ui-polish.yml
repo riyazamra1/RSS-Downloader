@@ -1,11 +1,6 @@
 name: RSS Downloader UI Polish
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/ui-polish.yml'
-      - 'android/app/src/main/java/com/riyaz/rssdownloader/MainActivity.kt'
   workflow_dispatch:
 
 permissions:
