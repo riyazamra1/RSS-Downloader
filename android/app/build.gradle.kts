@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -12,12 +13,19 @@ android {
         minSdk = 23
         targetSdk = 35
         versionCode = 3
-        versionName = "3.1"
-        buildConfigField("String", "RSS_HOST_BASE_URL", "\"https://rsscore.cv\"")
-        buildConfigField("String", "RSS_HOST_ACCESS_TOKEN", "\"\"")
+        versionName = "3.2"
+        buildConfigField("String", "RSS_HOST_BASE_URL", ""https://rsscore.cv"")
+        buildConfigField("String", "RSS_HOST_ACCESS_TOKEN", """")
     }
 
-    buildFeatures { buildConfig = true }
+    buildFeatures {
+        buildConfig = true
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "2.0.21"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -28,8 +36,14 @@ android {
 }
 
 dependencies {
+    implementation(project(":rss-common"))
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.compose.ui:ui:1.7.6")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.7.6")
+    implementation("androidx.compose.material3:material3:1.3.1")
+    implementation("androidx.compose.material:material-icons-extended:1.7.6")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.google.android.gms:play-services-ads:24.6.0")
     implementation("com.android.billingclient:billing-ktx:8.0.0")
