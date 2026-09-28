@@ -563,7 +563,8 @@ class MainActivity : AppCompatActivity() {
         }
         val uri = runCatching {
             DocumentsContract.createDocument(contentResolver, Uri.parse(savedTree), mime, filename)
-        }.getOrElse {
+        }.getOrNull()
+        if (uri == null) {
             pendingSaveJob = job
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
