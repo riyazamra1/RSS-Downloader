@@ -74,24 +74,37 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderSocial() {
         content.addView(label("Social Downloader",28,Color.WHITE,true))
-        content.addView(label("Copy or paste a supported URL. Analysis starts automatically.",
-            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(16)) })
+        content.addView(label("Paste a link. RSS Downloader detects and analyzes it automatically.",
+            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
+
         val card=card()
-        card.addView(label("DOWNLOAD",11,Color.rgb(212,175,55),true))
+        card.addView(label("AUTOMATIC URL DETECTION",11,Color.rgb(212,175,55),true))
         val input=EditText(this).apply {
-            hint="Paste URL here"
+            hint="Paste supported URL"
             setHintTextColor(Color.rgb(115,115,115))
             setTextColor(Color.WHITE)
             textSize=15f
             singleLine=true
             setPadding(dp(14),0,dp(14),0)
             setBackgroundColor(Color.rgb(28,28,28))
+            setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_share,0,0,0)
+            compoundDrawablePadding=dp(10)
+            contentDescription="Social media URL"
         }
         socialUrl=input
-        card.addView(input,LinearLayout.LayoutParams(-1,dp(54)))
-        card.addView(label("No Analyze button — valid URLs are analyzed automatically.",
-            12,Color.rgb(155,155,155),false).apply { setPadding(0,dp(8),0,0) })
+        card.addView(input,LinearLayout.LayoutParams(-1,dp(56)))
+        card.addView(label("✓ Automatic analysis • no Analyze button",
+            12,Color.rgb(155,155,155),false).apply { setPadding(0,dp(9),0,dp(0)) })
         content.addView(card)
+
+        val supported=card()
+        supported.addView(label("SUPPORTED SOURCES",11,Color.rgb(212,175,55),true))
+        supported.addView(label("Facebook  •  Instagram  •  X  •  Telegram",
+            13,Color.WHITE,false).apply { setPadding(0,dp(8),0,dp(3)) })
+        supported.addView(label("WhatsApp Status  •  Pinterest",
+            13,Color.rgb(185,185,185),false))
+        content.addView(supported)
+
         input.addTextChangedListener(object: android.text.TextWatcher {
             override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
             override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) {
