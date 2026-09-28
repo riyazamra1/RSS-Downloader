@@ -159,24 +159,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderMovie() {
-        content.addView(label("Movie",28,Color.WHITE,true))
-        val sub=LinearLayout(this)
-        sub.addView(button("Tamil",46) { movieTab=0; render() },LinearLayout.LayoutParams(0,dp(46),1f))
-        sub.addView(button("Dubbed",46) { movieTab=1; render() },
-            LinearLayout.LayoutParams(0,dp(46),1f).apply { leftMargin=dp(6) })
+        content.addView(label("Movies",28,Color.WHITE,true))
+        content.addView(label("Browse the pre-loaded catalogue or search within a category.",
+            13,Color.rgb(185,185,185),false).apply { setPadding(0,dp(5),0,dp(14)) })
+
+        val sub=LinearLayout(this).apply {
+            setPadding(dp(4),dp(4),dp(4),dp(4))
+            setBackgroundColor(Color.rgb(20,20,20))
+        }
+        val tamil=button(if(movieTab==0) "● Tamil" else "Tamil",44) { movieTab=0; render() }
+        val dubbed=button(if(movieTab==1) "● Dubbed" else "Dubbed",44) { movieTab=1; render() }
+        sub.addView(tamil,LinearLayout.LayoutParams(0,dp(44),1f))
+        sub.addView(dubbed,LinearLayout.LayoutParams(0,dp(44),1f).apply { leftMargin=dp(6) })
         content.addView(sub)
+
+        val searchCard=card()
+        searchCard.addView(label("MOVIE SEARCH",11,Color.rgb(212,175,55),true))
         val search=EditText(this).apply {
-            hint="Search movies"
+            hint=if(movieTab==0) "Search Tamil movies" else "Search Tamil dubbed movies"
             setHintTextColor(Color.rgb(115,115,115))
             setTextColor(Color.WHITE)
             textSize=15f
             singleLine=true
             setPadding(dp(14),0,dp(14),0)
             setBackgroundColor(Color.rgb(28,28,28))
+            imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
         }
-        content.addView(search,LinearLayout.LayoutParams(-1,dp(52)).apply { topMargin=dp(14) })
-        content.addView(button("Search",48) { loadMovies(search.text.toString()) },
-            LinearLayout.LayoutParams(-1,dp(48)).apply { topMargin=dp(8) })
+        searchCard.addView(search,LinearLayout.LayoutParams(-1,dp(54)).apply { topMargin=dp(8) })
+        search.setOnEditorActionListener { _, actionId, _ ->
+            if(actionId==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                loadMovies(search.text.toString()); true
+            } else false
+        }
+        content.addView(searchCard)
+
+        val catalogue=card()
+        catalogue.addView(label(if(movieTab==0) "TAMIL CATALOGUE" else "DUBBED CATALOGUE",
+            11,Color.rgb(212,175,55),true))
+        catalogue.addView(label("Loading pre-loaded movies…",12,Color.rgb(155,155,155),false)
+            .apply { setPadding(0,dp(8),0,dp(0)) })
+        content.addView(catalogue)
         loadMovies("")
     }
 
