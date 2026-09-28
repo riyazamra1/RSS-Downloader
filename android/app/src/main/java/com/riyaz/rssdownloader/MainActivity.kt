@@ -10,6 +10,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 
 class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
@@ -55,11 +56,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun mainNavigation(): View = LinearLayout(this).apply {
-        setPadding(dp(8),dp(7),dp(8),dp(9))
-        setBackgroundColor(Color.rgb(18,18,18))
-        listOf("Social Downloader","Movie","Settings").forEachIndexed { index,name ->
-            addView(button(if (mainTab == index) "● $name" else name,54) { mainTab=index; render() },
-                LinearLayout.LayoutParams(0,dp(54),1f).apply { setMargins(dp(3),0,dp(3),0) })
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(8),dp(6),dp(8),dp(8))
+        setBackgroundColor(Color.rgb(12,12,12))
+        elevation = dp(8).toFloat()
+        val items = listOf(Triple("⌂","Social","Social Downloader"),Triple("▣","Movies","Movie"),Triple("⚙","Settings","Settings"))
+        items.forEachIndexed { index, item ->
+            val selected = mainTab == index
+            val box = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(4),dp(4),dp(4),dp(3))
+                setBackgroundColor(if(selected) Color.rgb(42,36,20) else Color.TRANSPARENT)
+                isClickable = true
+                isFocusable = true
+                contentDescription = item.third
+                setOnClickListener { mainTab=index; render() }
+            }
+            box.addView(TextView(this@MainActivity).apply {
+                text = item.first; textSize = if(selected) 20f else 18f; gravity = Gravity.CENTER
+                setTextColor(if(selected) Color.rgb(212,175,55) else Color.rgb(155,155,155))
+            }, LinearLayout.LayoutParams(-1,dp(25)))
+            box.addView(TextView(this@MainActivity).apply {
+                text = item.second; textSize = 11f; gravity = Gravity.CENTER
+                setTextColor(if(selected) Color.WHITE else Color.rgb(155,155,155))
+                typeface = if(selected) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+            }, LinearLayout.LayoutParams(-1,dp(20)))
+            addView(box, LinearLayout.LayoutParams(0,dp(58),1f).apply { setMargins(dp(3),0,dp(3),0) })
         }
     }
 
@@ -93,7 +116,7 @@ class MainActivity : AppCompatActivity() {
         }
         socialUrl=input
         card.addView(input,LinearLayout.LayoutParams(-1,dp(56)))
-        card.addView(label("✓ Automatic analysis • no Analyze button",
+        card.addView(label("Automatic analysis starts after a valid link is detected.",
             12,Color.rgb(155,155,155),false).apply { setPadding(0,dp(9),0,dp(0)) })
         content.addView(card)
 
@@ -332,8 +355,34 @@ class MainActivity : AppCompatActivity() {
     private fun settingsRow(title:String,subtitle:String):View=LinearLayout(this).apply {
         orientation=LinearLayout.VERTICAL
         setPadding(dp(2),dp(12),dp(2),dp(12))
-        addView(label(title,15,Color.WHITE,true))
+        isClickable=true
+        isFocusable=true
+        addView(label(title+"  ›",15,Color.WHITE,true))
         addView(label(subtitle,12,Color.rgb(165,165,165),false).apply { setPadding(0,dp(4),0,0) })
+        setOnClickListener {
+            when(title) {
+                "Theme" -> showThemeChooser()
+                "Download location" -> Toast.makeText(this@MainActivity,"Download location selection will be connected to Android storage.",Toast.LENGTH_SHORT).show()
+                "Download history" -> Toast.makeText(this@MainActivity,"Download history will be connected to RSS Core jobs.",Toast.LENGTH_SHORT).show()
+                "Premium" -> Toast.makeText(this@MainActivity,"Premium entitlement is controlled by RSS Core.",Toast.LENGTH_SHORT).show()
+                "Connection" -> Toast.makeText(this@MainActivity,"RSS Core connection: "+if(api.configured()) "configured" else "not configured",Toast.LENGTH_SHORT).show()
+                "About" -> Toast.makeText(this@MainActivity,"RSS Downloader • RSS KIT interface • RSS Core + RAY",Toast.LENGTH_LONG).show()
+                "Privacy Policy" -> Toast.makeText(this@MainActivity,"Privacy Policy will open from the RSS Core hosted policy.",Toast.LENGTH_SHORT).show()
+                "Terms & Conditions" -> Toast.makeText(this@MainActivity,"Terms & Conditions will open from the RSS Core hosted terms.",Toast.LENGTH_SHORT).show()
+                "Interface" -> Toast.makeText(this@MainActivity,"RSS KIT visual system",Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showThemeChooser() {
+        val options = arrayOf("System default","Light","Dark")
+        val current = prefs.getString("theme","System default")
+        AlertDialog.Builder(this).setTitle("Appearance")
+            .setSingleChoiceItems(options, options.indexOf(current).coerceAtLeast(0)) { dialog, which ->
+                prefs.edit().putString("theme",options[which]).apply()
+                Toast.makeText(this,"Theme preference saved.",Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }.show()
     }
 
     private fun connectionCard():View=card().apply {
