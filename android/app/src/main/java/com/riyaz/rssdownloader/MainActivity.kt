@@ -55,21 +55,6 @@ class MainActivity : AppCompatActivity() {
         render()
     }
 
-    private fun header(): View = LinearLayout(this).apply {
-        gravity=Gravity.CENTER_VERTICAL
-        setPadding(dp(16),dp(10),dp(16),dp(10))
-        addView(ImageView(this@MainActivity).apply {
-            setImageResource(R.drawable.rss_downloader_logo)
-            scaleType=ImageView.ScaleType.FIT_CENTER
-            contentDescription="RSS Downloader"
-        },LinearLayout.LayoutParams(dp(50),dp(50)))
-        addView(LinearLayout(this@MainActivity).apply {
-            orientation=LinearLayout.VERTICAL
-            addView(label("RSS Downloader",20,Color.WHITE,true))
-            addView(label("RSS KIT  •  RSS Core  •  RAY",10,Color.rgb(165,165,165),false))
-        },LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(dp(12),0,0,0) })
-    }
-
     private fun mainNavigation(): View = LinearLayout(this).apply {
         setPadding(dp(8),dp(7),dp(8),dp(9))
         setBackgroundColor(Color.rgb(18,18,18))
