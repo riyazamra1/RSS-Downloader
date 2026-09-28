@@ -14,8 +14,8 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "3.2"
-        buildConfigField("String", "RSS_HOST_BASE_URL", ""https://rsscore.cv"")
-        buildConfigField("String", "RSS_HOST_ACCESS_TOKEN", """")
+        buildConfigField("String", "RSS_HOST_BASE_URL", "\"https://rsscore.cv\"")
+        buildConfigField("String", "RSS_HOST_ACCESS_TOKEN", "\"\"")
     }
 
     buildFeatures {
