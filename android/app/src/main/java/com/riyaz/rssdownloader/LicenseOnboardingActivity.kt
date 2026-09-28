@@ -242,7 +242,15 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                         .putString("display_name",n).putString("email",e)
                         .putString("plan",r.optJSONObject("license")?.optString("plan").orEmpty())
                         .putString("license_status",r.optJSONObject("license")?.optString("status").orEmpty()).apply()
-                    if (verified) showOnboarding() else { showVerification(); updateVerificationCountdown() }
+                    if (verified) {
+                        // An already-verified account returned through registration must use
+                        // the normal returning-session path so RSS Core can issue Welcome Back
+                        // exactly once for a new device/session.
+                        sendReturningSession()
+                    } else {
+                        showVerification()
+                        updateVerificationCountdown()
+                    }
                 }
                     .onFailure {
                         status.text=it.message ?: "Registration failed. Please try again."
