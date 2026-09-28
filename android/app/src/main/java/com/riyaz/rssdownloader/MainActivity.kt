@@ -43,7 +43,6 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(9,9,9))
         }
-        root.addView(header(), LinearLayout.LayoutParams(-1, dp(76)))
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16),dp(12),dp(16),dp(16))
@@ -59,7 +58,7 @@ class MainActivity : AppCompatActivity() {
         setPadding(dp(8),dp(7),dp(8),dp(9))
         setBackgroundColor(Color.rgb(18,18,18))
         listOf("Social Downloader","Movie","Settings").forEachIndexed { index,name ->
-            addView(button(name,54) { mainTab=index; render() },
+            addView(button(if (mainTab == index) "● $name" else name,54) { mainTab=index; render() },
                 LinearLayout.LayoutParams(0,dp(54),1f).apply { setMargins(dp(3),0,dp(3),0) })
         }
     }
