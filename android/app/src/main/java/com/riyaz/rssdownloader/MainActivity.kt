@@ -3,6 +3,7 @@ package com.riyaz.rssdownloader
 import android.os.Bundle
 import android.content.Context
 import android.content.ClipboardManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -59,7 +60,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var movieTab by remember { mutableIntStateOf(0) }
     var movieSearch by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
-    var analysis by remember { mutableStateOf<NativeHostApi.AnalyzeResult?>(null) }
+    var analysis by remember { mutableStateOf<NativeHostApi.Analysis?>(null) }
     var analysisError by remember { mutableStateOf<String?>(null) }
     var movies by remember { mutableStateOf<List<NativeHostApi.SearchResult>>(emptyList()) }
     var movieError by remember { mutableStateOf<String?>(null) }
