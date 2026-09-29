@@ -323,10 +323,9 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
 
             }
         }
+        )
     }
-            }
-        }
-    }
+)
 
     if (themeDialog) {
         val options = listOf("System default", "Light", "Dark")
