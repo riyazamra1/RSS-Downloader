@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +44,11 @@ fun RssSlideMenu(
     logo: Painter? = null,
     companyLogo: Painter? = null,
     selectedTitle: String? = null,
+    companyName: String = RssBrand.COMPANY_NAME,
+    companyWebsite: String = "www.rsscctvsolution.eu.cc",
+    companyEmail: String = "rsscctvsolution@gmail.com",
+    companyPhone: String = "077 115 5504 | 070 155 5504",
+    appVersion: String? = null,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(28.dp)
@@ -149,14 +155,22 @@ fun RssSlideMenu(
             }
 
             Spacer(Modifier.weight(1f))
-            if (companyLogo != null) {
-                HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                Column(
-                    Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Image(companyLogo, "Razeen Secure Solution logo", Modifier.size(46.dp))
-                    Text(RssBrand.COMPANY_NAME, Modifier.padding(top = 4.dp))
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                AsyncImage(
+                    model = "https://raw.githubusercontent.com/riyazamra1/RSS-Brand-Kit/23dfb364b1e4a0be1c05375d7755f50611847938/brand/logo/rss-logo-only.png",
+                    contentDescription = "Razeen Secure Solution logo",
+                    modifier = Modifier.size(48.dp)
+                )
+                Text(companyName, style = MaterialTheme.typography.labelLarge)
+                Text(companyWebsite, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(companyEmail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(companyPhone, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                appVersion?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
