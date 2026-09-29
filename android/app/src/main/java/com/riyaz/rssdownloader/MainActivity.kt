@@ -66,6 +66,10 @@ class MainActivity : ComponentActivity() {
 private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPreferences) {
     val context = LocalContext.current
     var tab by remember { mutableIntStateOf(0) }
+    var imageFormatExpanded by remember { mutableStateOf(false) }
+    var imageSizeExpanded by remember { mutableStateOf(false) }
+    var selectedImageFormat by remember { mutableStateOf("Original") }
+    var selectedImageSize by remember { mutableStateOf("Original") }
     var imageFormat by remember { mutableStateOf("Original") }
     var imageSize by remember { mutableStateOf("Original") }
     var movieTab by remember { mutableIntStateOf(0) }
@@ -119,7 +123,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     }
 
     LaunchedEffect(tab, movieTab, movieSearch) {
-        if (tab != 1) return@LaunchedEffect
+        if (tab != 2) return@LaunchedEffect
         movieError = null
         val source = if (movieTab == 0) "tamil-movies" else "tamil-dubbed-movies"
         api.search(source, movieSearch) { result ->
@@ -133,7 +137,8 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     val scope = rememberCoroutineScope()
     val menuItems = listOf(
         RssMenuItem("Social Downloader", Icons.Default.Home) { tab = 0; selectedMovie = null },
-        RssMenuItem("Movies", Icons.Default.Movie) { tab = 1; selectedMovie = null },
+        RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 1; selectedMovie = null },
+        RssMenuItem("Movies", Icons.Default.Movie) { tab = 2; selectedMovie = null },
         RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 2; selectedMovie = null },
         RssMenuItem("Settings", Icons.Default.Settings) { tab = 3; selectedMovie = null },
         RssMenuItem("About", Icons.Default.Info) { aboutDialog = true }
@@ -240,6 +245,40 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                     }
                     1 -> {
                         item {
+                            Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste image URL") })
+                                    if (analysis != null) {
+                                        val imageOptions = analysis!!.mediaOptions.filter { it.kind.equals("image", ignoreCase = true) }
+                                        if (imageOptions.isNotEmpty()) {
+                                            AsyncImage(model = analysis!!.thumbnailUrl ?: analysis!!.normalizedUrl, contentDescription = analysis!!.title, modifier = Modifier.fillMaxWidth().height(240.dp), contentScale = ContentScale.Fit)
+                                            Text(analysis!!.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                            Box {
+                                                OutlinedButton(onClick = { imageFormatExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Format: $selectedImageFormat") }
+                                                DropdownMenu(expanded = imageFormatExpanded, onDismissRequest = { imageFormatExpanded = false }) {
+                                                    imageOptions.map { it.format.ifBlank { "original" }.uppercase() }.distinct().forEach { format ->
+                                                        DropdownMenuItem(text = { Text(format) }, onClick = { selectedImageFormat = format; imageFormatExpanded = false })
+                                                    }
+                                                }
+                                            }
+                                            Box {
+                                                OutlinedButton(onClick = { imageSizeExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Size: $selectedImageSize") }
+                                                DropdownMenu(expanded = imageSizeExpanded, onDismissRequest = { imageSizeExpanded = false }) {
+                                                    DropdownMenuItem(text = { Text("Original size") }, onClick = { selectedImageSize = "Original"; imageSizeExpanded = false })
+                                                }
+                                            }
+                                            val selected = imageOptions.firstOrNull { it.format.equals(selectedImageFormat, true) } ?: imageOptions.first()
+                                            Button(onClick = { api.createDownload(analysis!!.requestId, selected.id) { r -> r.onSuccess { Toast.makeText(context, "Image download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) {
+                                                Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("Download Image")
+                                            }
+                                        } else Text("No downloadable image was found for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    2 -> {
+                        item {
                             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                                 SegmentedButton(movieTab == 0, { movieTab = 0 }, SegmentedButtonDefaults.itemShape(0, 2)) { Text("Tamil") }
                                 SegmentedButton(movieTab == 1, { movieTab = 1 }, SegmentedButtonDefaults.itemShape(1, 2)) { Text("Dubbed") }
@@ -268,7 +307,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                         if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    else -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { action ->
+                    3 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { action ->
                             when (action) {
                                 "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
                                 "Download history" -> api.listDownloads { r -> r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } }
