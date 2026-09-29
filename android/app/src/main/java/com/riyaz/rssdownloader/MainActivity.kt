@@ -11,6 +11,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.draw.scale
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
@@ -134,7 +138,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val menuItems = listOf(
-        RssMenuItem("Social Downloader", Icons.Default.Home) { tab = 0; selectedMovie = null },
+        RssMenuItem("Social Downloader", Icons.Default.Share) { tab = 0; selectedMovie = null },
         RssMenuItem("Movies", Icons.Default.Movie) { tab = 1; selectedMovie = null },
         RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 2; selectedMovie = null },
         RssMenuItem("Settings", Icons.Default.Settings) { tab = 3; selectedMovie = null },
