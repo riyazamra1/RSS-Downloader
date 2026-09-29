@@ -26,6 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.scale
+import androidx.compose.material3.Icon
 import com.riyaz.rss.common.RssBrand
 import com.riyaz.rss.common.components.RssSettingRow
 
@@ -36,6 +42,7 @@ fun RssSlideMenu(
     items: List<RssMenuItem>,
     logo: Painter? = null,
     companyLogo: Painter? = null,
+    selectedTitle: String? = null,
     modifier: Modifier = Modifier
 ) {
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
@@ -65,11 +72,31 @@ fun RssSlideMenu(
             Text(RssBrand.SHORT_NAME, Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             items.forEachIndexed { index, item ->
+                val selected = item.title == selectedTitle
+                val scale by animateFloatAsState(if (selected) 1.04f else 1f, spring(), label = "menuScale")
+                val tint by animateColorAsState(
+                    when (item.title) {
+                        "Social Downloader" -> Color(0xFF42A5F5)
+                        "Audio Downloader" -> Color(0xFFAB47BC)
+                        "Image Downloader" -> Color(0xFF26A69A)
+                        "Movies" -> Color(0xFFFF7043)
+                        "Settings" -> Color(0xFFFFCA28)
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }, label = "menuIconColor"
+                )
                 AnimatedVisibility(true, enter = fadeIn(tween(180, delayMillis = 70 * index)) +
                     slideInHorizontally({ -it / 8 }, tween(220, delayMillis = 70 * index))) {
-                    RssSettingRow(item.icon, item.title, modifier = Modifier.fillMaxWidth()
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                        .clickable { item.onClick() }.padding(vertical = 2.dp))
+                    Row(
+                        Modifier.fillMaxWidth().scale(scale)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            .background(if (selected) tint.copy(alpha = 0.12f) else Color.Transparent)
+                            .clickable { item.onClick() }
+                            .padding(horizontal = 10.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(item.icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
+                        Text(item.title, modifier = Modifier.padding(start = 14.dp), fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal)
+                    }
                 }
             }
             Spacer(Modifier.weight(1f))
