@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.content.Context
 import android.content.ClipboardManager
 import android.widget.Toast
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -177,6 +179,13 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                         Text("Preview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                         Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                         Text(result.normalizedUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
+OutlinedButton(onClick = {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.normalizedUrl))) }
+        .onFailure { Toast.makeText(context, "Unable to open source", Toast.LENGTH_SHORT).show() }
+}, modifier = Modifier.fillMaxWidth()) {
+    Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(8.dp)); Text("Open Source")
+}
+if (result.mediaOptions.isEmpty()) Text("No authorized download options were returned for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         result.mediaOptions.forEach { option ->
                                             Button(
                                                 onClick = {
