@@ -287,7 +287,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
         )
     }
 
-    historyJobs?.let { jobs -> AlertDialog(onDismissRequest = { historyJobs = null }, title = { Text("Download history") }, text = { if (jobs.isEmpty()) Text("No downloads yet.") else LazyColumn { items(jobs) { job -> item { Text("${job.title ?: job.filename ?: job.jobId} • ${job.status}", modifier = Modifier.padding(vertical = 4.dp)) } } } }, confirmButton = { TextButton(onClick = { historyJobs = null }) { Text("Close") } }) }
+    historyJobs?.let { jobs -> AlertDialog(onDismissRequest = { historyJobs = null }, title = { Text("Download history") }, text = { if (jobs.isEmpty()) Text("No downloads yet.") else LazyColumn { items(jobs) { job -> Text("${job.title ?: job.filename ?: job.jobId} • ${job.status}", modifier = Modifier.padding(vertical = 4.dp)) } } }, confirmButton = { TextButton(onClick = { historyJobs = null }) { Text("Close") } }) }
     premiumText?.let { msg -> AlertDialog(onDismissRequest = { premiumText = null }, title = { Text("RSS Core") }, text = { Text(msg) }, confirmButton = { TextButton(onClick = { premiumText = null }) { Text("Close") } }) }
     settingsDialog?.let { title ->
         AlertDialog(
