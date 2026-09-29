@@ -100,7 +100,6 @@ fun RssSlideMenu(
             if (!userEmail.isNullOrBlank()) {
                 Text(userEmail, Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
             }
-            Text(RssBrand.SHORT_NAME, Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             items.forEachIndexed { index, item ->
