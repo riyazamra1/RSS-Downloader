@@ -7,8 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val RssGold = Color(0xFFC9A227)
-private val LightBackground = Color(0xFFFFFFFF)
-private val LightSurface = Color(0xFFF6F4EF)
+private val LightBackground = Color(0xFFFAFAFA)
+private val LightSurface = Color(0xFFFFFFFF)
 private val DarkBackground = Color(0xFF0B0B0D)
 private val DarkSurface = Color(0xFF151518)
 
