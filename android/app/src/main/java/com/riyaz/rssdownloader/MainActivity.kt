@@ -66,6 +66,8 @@ class MainActivity : ComponentActivity() {
 private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPreferences) {
     val context = LocalContext.current
     var tab by remember { mutableIntStateOf(0) }
+    var imageFormat by remember { mutableStateOf("Original") }
+    var imageSize by remember { mutableStateOf("Original") }
     var movieTab by remember { mutableIntStateOf(0) }
     var movieSearch by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
@@ -132,7 +134,8 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     val menuItems = listOf(
         RssMenuItem("Social Downloader", Icons.Default.Home) { tab = 0; selectedMovie = null },
         RssMenuItem("Movies", Icons.Default.Movie) { tab = 1; selectedMovie = null },
-        RssMenuItem("Settings", Icons.Default.Settings) { tab = 2; selectedMovie = null },
+        RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 2; selectedMovie = null },
+        RssMenuItem("Settings", Icons.Default.Settings) { tab = 3; selectedMovie = null },
         RssMenuItem("About", Icons.Default.Info) { aboutDialog = true }
     )
 
@@ -158,7 +161,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                 TopAppBar(
                     title = {
                         Text(
-                            when (tab) { 0 -> "Social Downloader"; 1 -> "Movies"; else -> "Settings" },
+                            when (tab) { 0 -> "Social Downloader"; 1 -> "Movies"; 2 -> "Image Downloader"; else -> "Settings" },
                             fontWeight = FontWeight.Bold
                         )
                     },
