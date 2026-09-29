@@ -121,7 +121,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     }
 
     LaunchedEffect(tab, movieTab, movieSearch) {
-        if (tab != 2) return@LaunchedEffect
+        if (tab != 3) return@LaunchedEffect
         movieError = null
         val source = if (movieTab == 0) "tamil-movies" else "tamil-dubbed-movies"
         api.search(source, movieSearch) { result ->
@@ -241,6 +241,9 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                     }
                     1 -> {
+                        item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") }); if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { api.createDownload(analysis!!.requestId, option.id) { r -> r.onSuccess { Toast.makeText(context, "Audio download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
+                    }
+                    3 -> {
                         item {
                             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                                 SegmentedButton(movieTab == 0, { movieTab = 0 }, SegmentedButtonDefaults.itemShape(0, 2)) { Text("Tamil") }
@@ -270,7 +273,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                         if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    3 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { action ->
+                    4 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { action ->
                             when (action) {
                                 "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
                                 "Download history" -> api.listDownloads { r -> r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } }
