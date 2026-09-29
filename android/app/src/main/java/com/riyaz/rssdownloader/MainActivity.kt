@@ -226,7 +226,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                         }
                         if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    else -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }) }
+                    else -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { settingsDialog = it }) }
                 }
             }
         }
@@ -324,34 +324,35 @@ private fun SettingsContent(
     prefs: android.content.SharedPreferences,
     api: NativeHostApi,
     onTheme: () -> Unit,
-    onAbout: () -> Unit
+    onAbout: () -> Unit,
+    onSetting: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Card(shape = RoundedCornerShape(18.dp)) {
             Column {
                 RssSettingRow(Icons.Default.Cloud, "RSS Core account", "Account and session")
                 Divider()
-                RssSettingRow(Icons.Default.Storage, "Download location", "Device storage", Modifier.clickable { settingsDialog = "Download location" })
+                RssSettingRow(Icons.Default.Storage, "Download location", "Device storage", Modifier.clickable { onSetting("Download location") })
                 Divider()
-                RssSettingRow(Icons.Default.Download, "Download history", "Queued and completed", Modifier.clickable { settingsDialog = "Download history" })
+                RssSettingRow(Icons.Default.Download, "Download history", "Queued and completed", Modifier.clickable { onSetting("Download history") })
             }
         }
         Card(shape = RoundedCornerShape(18.dp)) {
             Column {
                 RssSettingRow(Icons.Default.DarkMode, "Theme", prefs.getString("theme", "System default"), Modifier.clickable { onTheme() })
                 Divider()
-                RssSettingRow(Icons.Default.WorkspacePremium, "Premium", "RSS Core entitlement", Modifier.clickable { settingsDialog = "Premium" })
+                RssSettingRow(Icons.Default.WorkspacePremium, "Premium", "RSS Core entitlement", Modifier.clickable { onSetting("Premium") })
                 Divider()
-                RssSettingRow(Icons.Default.Cloud, "Connection", if (api.configured()) "RSS Core connected" else "Not configured", Modifier.clickable { settingsDialog = "Connection" })
+                RssSettingRow(Icons.Default.Cloud, "Connection", if (api.configured()) "RSS Core connected" else "Not configured", Modifier.clickable { onSetting("Connection") })
             }
         }
         Card(shape = RoundedCornerShape(18.dp)) {
             Column {
                 RssSettingRow(Icons.Default.Info, "About", "RSS Downloader", Modifier.clickable { onAbout() })
                 Divider()
-                RssSettingRow(Icons.Default.Description, "Privacy Policy", modifier = Modifier.clickable { settingsDialog = "Privacy Policy" })
+                RssSettingRow(Icons.Default.Description, "Privacy Policy", modifier = Modifier.clickable { onSetting("Privacy Policy") })
                 Divider()
-                RssSettingRow(Icons.Default.Description, "Terms & Conditions", modifier = Modifier.clickable { settingsDialog = "Terms & Conditions" })
+                RssSettingRow(Icons.Default.Description, "Terms & Conditions", modifier = Modifier.clickable { onSetting("Terms & Conditions") })
             }
         }
         Text("${RssBrand.SHORT_NAME} • ${RssBrand.COMPANY_NAME}", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
