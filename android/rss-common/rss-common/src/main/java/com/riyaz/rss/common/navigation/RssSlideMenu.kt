@@ -27,7 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.scale
@@ -56,7 +58,7 @@ fun RssSlideMenu(
         tonalElevation = 8.dp
     ) {
         Column(Modifier.fillMaxHeight().fillMaxWidth().padding(vertical = 18.dp, horizontal = 10.dp)) {
-            AnimatedVisibility(logo != null, enter = fadeIn(tween(220)) + slideInHorizontally({ -it / 5 }, tween(260))) {
+            AnimatedVisibility(logo != null, enter = fadeIn(tween(220)) + slideInHorizontally(initialOffsetX = { -it / 5 }, animationSpec = tween(260))) {
                 if (logo != null) {
                     Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f))
@@ -85,7 +87,7 @@ fun RssSlideMenu(
                     }, label = "menuIconColor"
                 )
                 AnimatedVisibility(true, enter = fadeIn(tween(180, delayMillis = 70 * index)) +
-                    slideInHorizontally({ -it / 8 }, tween(220, delayMillis = 70 * index))) {
+                    slideInHorizontally(initialOffsetX = { -it / 8 }, animationSpec = tween(220, delayMillis = 70 * index))) {
                     Row(
                         Modifier.fillMaxWidth().scale(scale)
                             .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
