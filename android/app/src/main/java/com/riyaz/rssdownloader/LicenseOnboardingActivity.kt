@@ -405,7 +405,8 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                         .putString("plan",license?.optString("plan").orEmpty())
                         .putString("license_status",license?.optString("status").orEmpty())
                         .apply()
-                    openApp()
+                    if (prefs.getBoolean("onboarding_complete", false)) openApp()
+                    else showOnboarding()
                 }.onFailure { error ->
                     Toast.makeText(this,error.message ?: "Unable to restore RSS Core session.",Toast.LENGTH_LONG).show()
                     openApp()
