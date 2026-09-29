@@ -11,6 +11,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,6 +34,8 @@ import androidx.appcompat.app.AppCompatDelegate
 import com.riyaz.rss.common.RssBrand
 import com.riyaz.rss.common.components.RssSettingRow
 import com.riyaz.rss.common.theme.RssTheme
+import com.riyaz.rss.common.navigation.RssMenuItem
+import com.riyaz.rss.common.navigation.RssSlideMenu
 import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
@@ -121,16 +127,49 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
 
     BackHandler(enabled = selectedMovie != null) { selectedMovie = null }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                NavigationBarItem(tab == 0, { tab = 0; selectedMovie = null }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Social") })
-                NavigationBarItem(tab == 1, { tab = 1; selectedMovie = null }, icon = { Icon(Icons.Default.Movie, null) }, label = { Text("Movies") })
-                NavigationBarItem(tab == 2, { tab = 2; selectedMovie = null }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
-            }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val menuItems = listOf(
+        RssMenuItem("Social Downloader", Icons.Default.Home) { tab = 0; selectedMovie = null },
+        RssMenuItem("Movies", Icons.Default.Movie) { tab = 1; selectedMovie = null },
+        RssMenuItem("Settings", Icons.Default.Settings) { tab = 2; selectedMovie = null },
+        RssMenuItem("About", Icons.Default.Info) { aboutDialog = true }
+    )
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            RssSlideMenu(
+                userName = prefs.getString("name", null),
+                userEmail = prefs.getString("email", null),
+                items = menuItems.map { item ->
+                    item.copy(onClick = {
+                        item.onClick()
+                        scope.launch { drawerState.close() }
+                    })
+                },
+                logo = painterResource(com.riyaz.rssdownloader.R.drawable.rss_downloader_logo)
+            )
         }
-    ) { padding ->
+    ) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            when (tab) { 0 -> "Social Downloader"; 1 -> "Movies"; else -> "Settings" },
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open menu")
+                        }
+                    }
+                )
+            }
+        ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -140,20 +179,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                 item { MovieDetails(selectedMovie!!, api) { selectedMovie = null } }
             } else {
                 item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(com.riyaz.rssdownloader.R.drawable.rss_downloader_logo),
-                            contentDescription = "RSS Downloader",
-                            modifier = Modifier.size(46.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            when (tab) { 0 -> "Social Downloader"; 1 -> "Movies"; else -> "Settings" },
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+
                 }
                 when (tab) {
                     0 -> {
