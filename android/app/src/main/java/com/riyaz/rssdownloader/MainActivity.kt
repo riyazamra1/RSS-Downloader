@@ -72,6 +72,8 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var lastAnalyzed by remember { mutableStateOf("") }
     var preview by remember { mutableStateOf(false) }
     var settingsDialog by remember { mutableStateOf<String?>(null) }
+    var historyJobs by remember { mutableStateOf<List<NativeHostApi.Job>?>(null) }
+    var premiumText by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -235,7 +237,17 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                         if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    else -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { settingsDialog = it }) }
+                    else -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { action ->
+                            when (action) {
+                                "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
+                                "Download history" -> api.listDownloads { r -> r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } }
+                                "Premium" -> api.checkPremium(prefs.getString("email", "").orEmpty()) { r -> r.onSuccess { premiumText = if (it) "Premium is active." else "Premium is not active." }.onFailure { premiumText = it.message ?: "Premium status unavailable" } }
+                                "Connection" -> premiumText = if (api.configured()) "RSS Core is configured at ${BuildConfig.RSS_HOST_BASE_URL}" else "RSS Core is not configured."
+                                "Privacy Policy" -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rsscore.cv/privacy"))) }
+                                "Terms & Conditions" -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rsscore.cv/terms"))) }
+                                else -> settingsDialog = action
+                            }
+                        }) }
                 }
             }
         }
@@ -273,6 +285,8 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
         )
     }
 
+    historyJobs?.let { jobs -> AlertDialog(onDismissRequest = { historyJobs = null }, title = { Text("Download history") }, text = { if (jobs.isEmpty()) Text("No downloads yet.") else LazyColumn { items(jobs) { job -> item { Text("${job.title ?: job.filename ?: job.jobId} • ${job.status}", modifier = Modifier.padding(vertical = 4.dp)) } } } }, confirmButton = { TextButton(onClick = { historyJobs = null }) { Text("Close") } }) }
+    premiumText?.let { msg -> AlertDialog(onDismissRequest = { premiumText = null }, title = { Text("RSS Core") }, text = { Text(msg) }, confirmButton = { TextButton(onClick = { premiumText = null }) { Text("Close") } }) }
     settingsDialog?.let { title ->
         AlertDialog(
             onDismissRequest = { settingsDialog = null },
