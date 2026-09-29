@@ -11,7 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.draw.scale
@@ -188,9 +187,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             if (selectedMovie != null) {
                 item { MovieDetails(selectedMovie!!, api) { selectedMovie = null } }
             } else {
-                item {
-
-                }
                 when (tab) {
                     0 -> {
                         item {
@@ -278,7 +274,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                         if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    4 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }, { action ->
+                    4 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }) { action ->
                             when (action) {
                                 "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
                                 "Download history" -> api.listDownloads { r -> r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } }
@@ -288,7 +284,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                 "Terms & Conditions" -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rsscore.cv/terms"))) }
                                 else -> settingsDialog = action
                             }
-                        }) }
+                        } }
                 }
                     2 -> {
                         item {
