@@ -88,6 +88,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var settingsDialog by remember { mutableStateOf<String?>(null) }
     var historyJobs by remember { mutableStateOf<List<NativeHostApi.Job>?>(null) }
     var premiumText by remember { mutableStateOf<String?>(null) }
+    var sourceDialogUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -157,7 +158,12 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                         scope.launch { drawerState.close() }
                     })
                 },
-                logo = painterResource(com.riyaz.rssdownloader.R.drawable.rss_downloader_logo)
+                logo = painterResource(com.riyaz.rssdownloader.R.drawable.rss_downloader_logo),
+                companyName = RssBrand.COMPANY_NAME,
+                companyWebsite = "www.rsscctvsolution.eu.cc",
+                companyEmail = "rsscctvsolution@gmail.com",
+                companyPhone = "077 115 5504 | 070 155 5504",
+                appVersion = "v" + BuildConfig.VERSION_NAME
             )
         }
     ) {
@@ -177,6 +183,18 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                         }
                     }
                 )
+            },
+            bottomBar = {
+                NavigationBar {
+                    menuItems.forEachIndexed { index, item ->
+                        NavigationBarItem(
+                            selected = tab == index,
+                            onClick = { tab = index; selectedMovie = null },
+                            icon = { Icon(item.icon, contentDescription = item.title) },
+                            label = { Text(item.title.removeSuffix(" Downloader")) }
+                        )
+                    }
+                }
             }
         ) { padding ->
         LazyColumn(
@@ -215,11 +233,8 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                         result.thumbnailUrl?.let { thumb -> AsyncImage(model = thumb, contentDescription = result.title, modifier = Modifier.fillMaxWidth().height(210.dp), contentScale = ContentScale.Crop) }
                                         Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                         Text(result.normalizedUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
-OutlinedButton(onClick = {
-    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.normalizedUrl))) }
-        .onFailure { Toast.makeText(context, "Unable to open source", Toast.LENGTH_SHORT).show() }
-}, modifier = Modifier.fillMaxWidth()) {
-    Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(8.dp)); Text("Open Source")
+OutlinedButton(onClick = { sourceDialogUrl = result.normalizedUrl }, modifier = Modifier.fillMaxWidth()) {
+    Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(8.dp)); Text("Source")
 }
 if (result.mediaOptions.isEmpty()) Text("No authorized download options were returned for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         result.mediaOptions.forEach { option ->
@@ -310,12 +325,13 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                     }
                     4 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }) { action ->
                             when (action) {
+                                "RSS Core account" -> settingsDialog = "Account: " + prefs.getString("email", "Not signed in")
                                 "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
                                 "Download history" -> api.listDownloads { r -> r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } }
                                 "Premium" -> api.checkPremium(prefs.getString("email", "").orEmpty()) { r -> r.onSuccess { premiumText = if (it) "Premium is active." else "Premium is not active." }.onFailure { premiumText = it.message ?: "Premium status unavailable" } }
                                 "Connection" -> premiumText = if (api.configured()) "RSS Core is configured at ${BuildConfig.RSS_HOST_BASE_URL}" else "RSS Core is not configured."
-                                "Privacy Policy" -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rsscore.cv/privacy"))) }
-                                "Terms & Conditions" -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rsscore.cv/terms"))) }
+                                "Privacy Policy" -> openWebPage(context, "https://rsscore.cv/privacy")
+                                "Terms & Conditions" -> openWebPage(context, "https://rsscore.cv/terms")
                                 else -> settingsDialog = action
                             }
                         } }
@@ -363,8 +379,32 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
         AlertDialog(
             onDismissRequest = { settingsDialog = null },
             title = { Text(title) },
-            text = { Text("RSS Downloader settings") },
+            text = {
+                Text(
+                    when (title) {
+                        "RSS Core account" -> "Email: " + prefs.getString("email", "Not signed in")
+                        "Connection" -> "Host: " + BuildConfig.RSS_HOST_BASE_URL + "\nStatus: " + if (api.configured()) "Configured" else "Not configured"
+                        else -> "This setting is connected to RSS Core and the Android system."
+                    }
+                )
+            },
             confirmButton = { TextButton(onClick = { settingsDialog = null }) { Text("Close") } }
+        )
+    }
+    sourceDialogUrl?.let { sourceUrl ->
+        AlertDialog(
+            onDismissRequest = { sourceDialogUrl = null },
+            title = { Text("Source") },
+            text = { Text(sourceUrl) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl))
+                    if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
+                    else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
+                    sourceDialogUrl = null
+                }) { Text("Open in browser") }
+            },
+            dismissButton = { TextButton(onClick = { sourceDialogUrl = null }) { Text("Cancel") } }
         )
     }
     if (aboutDialog) {
@@ -375,6 +415,12 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
             confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text("Close") } }
         )
     }
+}
+
+private fun openWebPage(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
+    else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
 }
 
 @Composable
@@ -425,7 +471,7 @@ private fun SettingsContent(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column {
-                RssSettingRow(Icons.Default.Cloud, "RSS Core account", "Account and session")
+                RssSettingRow(Icons.Default.Cloud, "RSS Core account", "Account and session", Modifier.clickable { onSetting("RSS Core account") })
                 Divider()
                 RssSettingRow(Icons.Default.Storage, "Download location", "Device storage", Modifier.clickable { onSetting("Download location") })
                 Divider()
