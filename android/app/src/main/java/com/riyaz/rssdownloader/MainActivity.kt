@@ -227,7 +227,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                             ) {
                                                 Icon(Icons.Default.Download, null)
                                                 Spacer(Modifier.width(8.dp))
-                                                Text("${option.format.uppercase()} • ${option.quality ?: "Available"}")
+                                                Text(if (option.kind.equals("image", ignoreCase = true)) "Download Original Image • ${option.format.uppercase()}" else "${option.format.uppercase()} • ${option.quality ?: "Available"}")
                                             }
                                         }
                                     }
@@ -362,7 +362,7 @@ private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, 
                     ) {
                         Icon(Icons.Default.Download, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("${option.format.uppercase()} • ${option.quality ?: "Available"}")
+                        Text(if (option.kind.equals("image", ignoreCase = true)) "Download Original Image • ${option.format.uppercase()}" else "${option.format.uppercase()} • ${option.quality ?: "Available"}")
                     }
                 }
             }
