@@ -30,6 +30,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import com.riyaz.rss.common.RssBrand
 import com.riyaz.rss.common.components.RssSettingRow
 import com.riyaz.rss.common.theme.RssTheme
+import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
@@ -179,6 +180,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                 Card(shape = RoundedCornerShape(20.dp)) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text("Preview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        result.thumbnailUrl?.let { thumb -> AsyncImage(model = thumb, contentDescription = result.title, modifier = Modifier.fillMaxWidth().height(210.dp), contentScale = ContentScale.Crop) }
                                         Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                         Text(result.normalizedUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
 OutlinedButton(onClick = {
