@@ -2,7 +2,6 @@ package com.riyaz.rss.common.navigation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -105,17 +104,14 @@ fun RssSlideMenu(
                     animationSpec = spring(),
                     label = "menuScale"
                 )
-                val tint by animateColorAsState(
-                    targetValue = when (item.title) {
-                        "Social Downloader" -> Color(0xFF42A5F5)
-                        "Audio Downloader" -> Color(0xFFAB47BC)
-                        "Image Downloader" -> Color(0xFF26A69A)
-                        "Movies" -> Color(0xFFFF7043)
-                        "Settings" -> Color(0xFFFFCA28)
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    label = "menuIconColor"
-                )
+                val tint = when (item.title) {
+                    "Social Downloader" -> Color(0xFF42A5F5)
+                    "Audio Downloader" -> Color(0xFFAB47BC)
+                    "Image Downloader" -> Color(0xFF26A69A)
+                    "Movies" -> Color(0xFFFF7043)
+                    "Settings" -> Color(0xFFFFCA28)
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
 
                 AnimatedVisibility(
                     visible = true,
