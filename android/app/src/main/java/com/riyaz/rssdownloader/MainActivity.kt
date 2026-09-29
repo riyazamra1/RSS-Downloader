@@ -158,7 +158,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                 when (tab) {
                     0 -> {
                         item {
-                            Card(shape = RoundedCornerShape(20.dp)) {
+                            Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                 Column(Modifier.padding(16.dp)) {
                                     OutlinedTextField(
                                         value = url,
@@ -177,7 +177,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                         }
                         if (preview) analysis?.let { result ->
                             item {
-                                Card(shape = RoundedCornerShape(20.dp)) {
+                                Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text("Preview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                         result.thumbnailUrl?.let { thumb -> AsyncImage(model = thumb, contentDescription = result.title, modifier = Modifier.fillMaxWidth().height(210.dp), contentScale = ContentScale.Crop) }
@@ -228,7 +228,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                         movieError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
                         items(movies) { movie ->
-                            Card(Modifier.fillMaxWidth().clickable { selectedMovie = movie }, shape = RoundedCornerShape(18.dp)) {
+                            Card(Modifier.fillMaxWidth().clickable { selectedMovie = movie }, shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                 Column(Modifier.padding(16.dp)) {
                                     Text(movie.title, fontWeight = FontWeight.Bold)
                                     val meta = listOfNotNull(movie.year?.toString(), movie.language, movie.releaseDate).joinToString(" • ")
@@ -312,7 +312,7 @@ private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, 
     val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = onBack) { Text("‹ Movies") }
-        Card(shape = RoundedCornerShape(20.dp)) {
+        Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column(Modifier.padding(16.dp)) {
                 Text(movie.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 val meta = listOfNotNull(movie.year?.toString(), movie.language, movie.releaseDate, movie.runtime, movie.director).joinToString(" • ")
@@ -320,7 +320,7 @@ private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, 
                 movie.synopsis?.takeIf { it.isNotBlank() }?.let { Text(it, Modifier.padding(top = 12.dp)) }
             }
         }
-        Card(shape = RoundedCornerShape(20.dp)) {
+        Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column(Modifier.padding(16.dp)) {
                 Text("Quality", fontWeight = FontWeight.Bold)
                 if (movie.mediaOptions.isEmpty()) {
@@ -353,7 +353,7 @@ private fun SettingsContent(
     onSetting: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Card(shape = RoundedCornerShape(18.dp)) {
+        Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column {
                 RssSettingRow(Icons.Default.Cloud, "RSS Core account", "Account and session")
                 Divider()
@@ -362,7 +362,7 @@ private fun SettingsContent(
                 RssSettingRow(Icons.Default.Download, "Download history", "Queued and completed", Modifier.clickable { onSetting("Download history") })
             }
         }
-        Card(shape = RoundedCornerShape(18.dp)) {
+        Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column {
                 RssSettingRow(Icons.Default.DarkMode, "Theme", prefs.getString("theme", "System default"), Modifier.clickable { onTheme() })
                 Divider()
@@ -371,7 +371,7 @@ private fun SettingsContent(
                 RssSettingRow(Icons.Default.Cloud, "Connection", if (api.configured()) "RSS Core connected" else "Not configured", Modifier.clickable { onSetting("Connection") })
             }
         }
-        Card(shape = RoundedCornerShape(18.dp)) {
+        Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column {
                 RssSettingRow(Icons.Default.Info, "About", "RSS Downloader", Modifier.clickable { onAbout() })
                 Divider()
