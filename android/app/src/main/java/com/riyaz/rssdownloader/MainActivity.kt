@@ -244,6 +244,40 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                     1 -> {
                         item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") }); if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { api.createDownload(analysis!!.requestId, option.id) { r -> r.onSuccess { Toast.makeText(context, "Audio download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
                     }
+                    2 -> {
+                        item {
+                            Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste image URL") })
+                                    if (analysis != null) {
+                                        val imageOptions = analysis!!.mediaOptions.filter { it.kind.equals("image", ignoreCase = true) }
+                                        if (imageOptions.isNotEmpty()) {
+                                            AsyncImage(model = analysis!!.thumbnailUrl ?: analysis!!.normalizedUrl, contentDescription = analysis!!.title, modifier = Modifier.fillMaxWidth().height(240.dp), contentScale = ContentScale.Fit)
+                                            Text(analysis!!.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                            Box {
+                                                OutlinedButton(onClick = { imageFormatExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Format: $selectedImageFormat") }
+                                                DropdownMenu(expanded = imageFormatExpanded, onDismissRequest = { imageFormatExpanded = false }) {
+                                                    imageOptions.map { it.format.ifBlank { "original" }.uppercase() }.distinct().forEach { format ->
+                                                        DropdownMenuItem(text = { Text(format) }, onClick = { selectedImageFormat = format; imageFormatExpanded = false })
+                                                    }
+                                                }
+                                            }
+                                            Box {
+                                                OutlinedButton(onClick = { imageSizeExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Size: $selectedImageSize") }
+                                                DropdownMenu(expanded = imageSizeExpanded, onDismissRequest = { imageSizeExpanded = false }) {
+                                                    DropdownMenuItem(text = { Text("Original size") }, onClick = { selectedImageSize = "Original"; imageSizeExpanded = false })
+                                                }
+                                            }
+                                            val selected = imageOptions.firstOrNull { it.format.equals(selectedImageFormat, true) } ?: imageOptions.first()
+                                            Button(onClick = { api.createDownload(analysis!!.requestId, selected.id) { r -> r.onSuccess { Toast.makeText(context, "Image download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) {
+                                                Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("Download Image")
+                                            }
+                                        } else Text("No downloadable image was found for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
                     3 -> {
                         item {
                             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -286,40 +320,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                             }
                         } }
                 }
-                    2 -> {
-                        item {
-                            Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste image URL") })
-                                    if (analysis != null) {
-                                        val imageOptions = analysis!!.mediaOptions.filter { it.kind.equals("image", ignoreCase = true) }
-                                        if (imageOptions.isNotEmpty()) {
-                                            AsyncImage(model = analysis!!.thumbnailUrl ?: analysis!!.normalizedUrl, contentDescription = analysis!!.title, modifier = Modifier.fillMaxWidth().height(240.dp), contentScale = ContentScale.Fit)
-                                            Text(analysis!!.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                            Box {
-                                                OutlinedButton(onClick = { imageFormatExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Format: $selectedImageFormat") }
-                                                DropdownMenu(expanded = imageFormatExpanded, onDismissRequest = { imageFormatExpanded = false }) {
-                                                    imageOptions.map { it.format.ifBlank { "original" }.uppercase() }.distinct().forEach { format ->
-                                                        DropdownMenuItem(text = { Text(format) }, onClick = { selectedImageFormat = format; imageFormatExpanded = false })
-                                                    }
-                                                }
-                                            }
-                                            Box {
-                                                OutlinedButton(onClick = { imageSizeExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Size: $selectedImageSize") }
-                                                DropdownMenu(expanded = imageSizeExpanded, onDismissRequest = { imageSizeExpanded = false }) {
-                                                    DropdownMenuItem(text = { Text("Original size") }, onClick = { selectedImageSize = "Original"; imageSizeExpanded = false })
-                                                }
-                                            }
-                                            val selected = imageOptions.firstOrNull { it.format.equals(selectedImageFormat, true) } ?: imageOptions.first()
-                                            Button(onClick = { api.createDownload(analysis!!.requestId, selected.id) { r -> r.onSuccess { Toast.makeText(context, "Image download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) {
-                                                Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("Download Image")
-                                            }
-                                        } else Text("No downloadable image was found for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
+
             }
         }
     }
