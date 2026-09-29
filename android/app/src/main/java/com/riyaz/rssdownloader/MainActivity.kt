@@ -139,10 +139,10 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     val scope = rememberCoroutineScope()
     val menuItems = listOf(
         RssMenuItem("Social Downloader", Icons.Default.Share) { tab = 0; selectedMovie = null },
-        RssMenuItem("Movies", Icons.Default.Movie) { tab = 1; selectedMovie = null },
+        RssMenuItem("Audio Downloader", Icons.Default.Audiotrack) { tab = 1; selectedMovie = null },
         RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 2; selectedMovie = null },
-        RssMenuItem("Settings", Icons.Default.Settings) { tab = 3; selectedMovie = null },
-        RssMenuItem("About", Icons.Default.Info) { aboutDialog = true }
+        RssMenuItem("Movies", Icons.Default.Movie) { tab = 3; selectedMovie = null },
+        RssMenuItem("Settings", Icons.Default.Settings) { tab = 4; selectedMovie = null }
     )
 
     ModalNavigationDrawer(
@@ -151,6 +151,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             RssSlideMenu(
                 userName = prefs.getString("name", null),
                 userEmail = prefs.getString("email", null),
+                selectedTitle = menuItems[tab].title,
                 items = menuItems.map { item ->
                     item.copy(onClick = {
                         item.onClick()
@@ -167,7 +168,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                 TopAppBar(
                     title = {
                         Text(
-                            when (tab) { 0 -> "Social Downloader"; 1 -> "Movies"; 2 -> "Image Downloader"; else -> "Settings" },
+                            when (tab) { 0 -> "Social Downloader"; 1 -> "Audio Downloader"; 2 -> "Image Downloader"; 3 -> "Movies"; else -> "Settings" },
                             fontWeight = FontWeight.Bold
                         )
                     },
