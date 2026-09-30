@@ -607,34 +607,58 @@ private fun SettingsContent(
     onAbout: () -> Unit,
     onSetting: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-            Column {
-                RssSettingRow(Icons.Default.Cloud, "RSS Core account", "Account and session", Modifier.clickable { onSetting("RSS Core account") })
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("RSS Downloader", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.padding(vertical = 4.dp)) {
+                RssSettingRow(Icons.Default.Storage, "Download location", "Choose where downloaded files are saved", Modifier.fillMaxWidth().clickable { onSetting("Download location") })
                 Divider()
-                RssSettingRow(Icons.Default.Storage, "Download location", "Device storage", Modifier.clickable { onSetting("Download location") })
-                Divider()
-                RssSettingRow(Icons.Default.Download, "Download history", "Queued and completed", Modifier.clickable { onSetting("Download history") })
+                RssSettingRow(Icons.Default.Download, "Download history", "View completed and queued downloads", Modifier.fillMaxWidth().clickable { onSetting("Download history") })
             }
         }
-        Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-            Column {
-                RssSettingRow(Icons.Default.DarkMode, "Appearance", prefs.getString("theme", "System default"), Modifier.clickable { onTheme() })
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.padding(vertical = 4.dp)) {
+                RssSettingRow(Icons.Default.DarkMode, "Appearance", prefs.getString("theme", "System default"), Modifier.fillMaxWidth().clickable { onTheme() })
                 Divider()
-                RssSettingRow(Icons.Default.WorkspacePremium, "Premium", "RSS Core entitlement", Modifier.clickable { onSetting("Premium") })
-                Divider()
-                RssSettingRow(Icons.Default.Cloud, "Connection", if (api.configured()) "RSS Core connected" else "Not configured", Modifier.clickable { onSetting("Connection") })
+                RssSettingRow(Icons.Default.WorkspacePremium, "Premium", "Manage your RSS Downloader plan", Modifier.fillMaxWidth().clickable { onSetting("Premium") })
             }
         }
-        Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-            Column {
-                RssSettingRow(Icons.Default.Info, "About", "RSS Downloader", Modifier.clickable { onAbout() })
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.padding(vertical = 4.dp)) {
+                RssSettingRow(Icons.Default.Info, "About", "RSS Downloader", Modifier.fillMaxWidth().clickable { onAbout() })
                 Divider()
-                RssSettingRow(Icons.Default.Description, "Privacy Policy", modifier = Modifier.clickable { onSetting("Privacy Policy") })
+                RssSettingRow(Icons.Default.Description, "Privacy Policy", modifier = Modifier.fillMaxWidth().clickable { onSetting("Privacy Policy") })
                 Divider()
-                RssSettingRow(Icons.Default.Description, "Terms & Conditions", modifier = Modifier.clickable { onSetting("Terms & Conditions") })
+                RssSettingRow(Icons.Default.Description, "Terms & Conditions", modifier = Modifier.fillMaxWidth().clickable { onSetting("Terms & Conditions") })
             }
         }
-        Text("${RssBrand.SHORT_NAME} • ${RssBrand.COMPANY_NAME}", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+        Text(
+            "Developing Ideas. Delivering Solutions.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
     }
 }
