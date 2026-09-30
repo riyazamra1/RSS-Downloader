@@ -19,7 +19,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check Google Drive configuration
+        id: drive_config
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          if [ -z "$GOOGLE_DRIVE_CLIENT_ID" ] || [ -z "$GOOGLE_DRIVE_CLIENT_SECRET" ] || [ -z "$GOOGLE_DRIVE_REFRESH_TOKEN" ] || [ -z "$GOOGLE_DRIVE_FOLDER_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Google Drive backup skipped because required repository secrets are not configured."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create complete project snapshot
+        if: steps.drive_config.outputs.configured == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -28,10 +44,7 @@ jobs:
           ZIP="RSS-Downloader-${TS}.zip"
           BUNDLE="RSS-Downloader-${TS}.bundle"
 
-          # Complete tracked project snapshot at the exact commit being backed up.
           git archive --format=zip --output="backup/${ZIP}" HEAD
-
-          # Git bundle preserves repository history and refs available to the runner.
           git bundle create "backup/${BUNDLE}" --all
 
           printf '%s\n' "commit=$(git rev-parse HEAD)" "created_at=${TS}" > backup/backup-manifest.txt
@@ -40,6 +53,7 @@ jobs:
           printf '%s\n' "git_history=${BUNDLE}" >> backup/backup-manifest.txt
 
       - name: Get Google OAuth access token
+        if: steps.drive_config.outputs.configured == 'true'
         id: google-token
         shell: bash
         env:
@@ -48,36 +62,29 @@ jobs:
           GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
         run: |
           set -euo pipefail
-          test -n "$GOOGLE_DRIVE_CLIENT_ID"
-          test -n "$GOOGLE_DRIVE_CLIENT_SECRET"
-          test -n "$GOOGLE_DRIVE_REFRESH_TOKEN"
-
           RESPONSE="$(curl -fsS -X POST https://oauth2.googleapis.com/token \
             -H 'Content-Type: application/x-www-form-urlencoded' \
             --data-urlencode "client_id=${GOOGLE_DRIVE_CLIENT_ID}" \
             --data-urlencode "client_secret=${GOOGLE_DRIVE_CLIENT_SECRET}" \
             --data-urlencode "refresh_token=${GOOGLE_DRIVE_REFRESH_TOKEN}" \
             --data-urlencode 'grant_type=refresh_token')"
-
           TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<< "$RESPONSE")"
           echo "access_token=${TOKEN}" >> "$GITHUB_OUTPUT"
 
       - name: Upload backups to Google Drive
+        if: steps.drive_config.outputs.configured == 'true'
         shell: bash
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.google-token.outputs.access_token }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
           set -euo pipefail
-          test -n "$GOOGLE_DRIVE_FOLDER_ID"
-
           upload_file() {
             local file="$1"
             local name
             name="$(basename "$file")"
             local metadata
             metadata="$(python -c 'import json,sys; print(json.dumps({"name":sys.argv[1],"parents":[sys.argv[2]]}))' "$name" "$GOOGLE_DRIVE_FOLDER_ID")"
-
             curl -fsS -X POST \
               'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart' \
               -H "Authorization: Bearer ${GOOGLE_ACCESS_TOKEN}" \
@@ -85,12 +92,10 @@ jobs:
               -F "file=@${file};type=application/octet-stream" \
               >/dev/null
           }
-
-          for file in backup/*; do
-            upload_file "$file"
-          done
+          for file in backup/*; do upload_file "$file"; done
 
       - name: Backup summary
+        if: steps.drive_config.outputs.configured == 'true'
         run: |
           echo "Google Drive backup completed successfully."
           ls -lh backup/
