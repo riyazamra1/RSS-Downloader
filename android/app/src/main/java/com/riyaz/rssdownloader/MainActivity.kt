@@ -68,8 +68,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun queueAndDeliver(context: Context, api: NativeHostApi, requestId: String, optionId: String, label: String) {
     api.createDownload(requestId, optionId) { result ->
         result.onFailure { error -> Toast.makeText(context, error.message ?: "Download failed", Toast.LENGTH_LONG).show() }
