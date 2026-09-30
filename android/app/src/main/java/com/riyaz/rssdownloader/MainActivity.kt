@@ -339,13 +339,15 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                     }
                     1 -> {
-                        item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") }); if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { queueAndDeliver(context, api, analysis!!.requestId, option.id, analysis!!.title) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
+                        item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = ""; analysis = null; analysisError = null }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") });
+Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled = !analyzing) { Icon(Icons.Default.Search, null); Spacer(Modifier.width(8.dp)); Text(if (analyzing) "Analyzing…" else "Analyze") }; if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { queueAndDeliver(context, api, analysis!!.requestId, option.id, analysis!!.title) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
                     }
                     2 -> {
                         item {
                             Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste image URL") })
+                                    OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = ""; analysis = null; analysisError = null }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste image URL") })
+Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled = !analyzing) { Icon(Icons.Default.Search, null); Spacer(Modifier.width(8.dp)); Text(if (analyzing) "Analyzing…" else "Analyze") }
                                     if (analysis != null) {
                                         val imageOptions = analysis!!.mediaOptions.filter { it.kind.equals("image", ignoreCase = true) }
                                         if (imageOptions.isNotEmpty()) {
@@ -486,17 +488,36 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
             text = { Text(sourceUrl) },
             confirmButton = {
                 TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl))
-                    runCatching {
-                        if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
-                        else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
-                    }.onFailure {
-                        Toast.makeText(context, "Unable to open source.", Toast.LENGTH_LONG).show()
-                    }
+                    sourceWebView = sourceUrl
                     sourceDialogUrl = null
-                }) { Text("Open in browser") }
+                }) { Text("Open source") }
             },
             dismissButton = { TextButton(onClick = { sourceDialogUrl = null }) { Text("Cancel") } }
+        )
+    }
+    sourceWebView?.let { pageUrl ->
+        AlertDialog(
+            onDismissRequest = { sourceWebView = null },
+            title = { Text("Source") },
+            text = {
+                AndroidView(
+                    factory = { context ->
+                        WebView(context).apply {
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.loadsImagesAutomatically = true
+                            settings.setSupportZoom(true)
+                            settings.builtInZoomControls = true
+                            settings.displayZoomControls = false
+                            setBackgroundColor(android.graphics.Color.WHITE)
+                            webViewClient = WebViewClient()
+                            loadUrl(pageUrl)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(560.dp)
+                )
+            },
+            confirmButton = { TextButton(onClick = { sourceWebView = null }) { Text("Close") } }
         )
     }
     if (aboutDialog) {
@@ -527,10 +548,18 @@ private fun MovieLivePage(url: String) {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.loadsImagesAutomatically = true
+                settings.allowFileAccess = false
+                settings.allowContentAccess = true
+                settings.setSupportZoom(true)
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
+                isVerticalScrollBarEnabled = true
+                isHorizontalScrollBarEnabled = false
+                setBackgroundColor(android.graphics.Color.WHITE)
                 webViewClient = WebViewClient()
-                loadUrl(url)
             }
         },
+        update = { it.loadUrl(url) },
         modifier = Modifier.fillMaxWidth().height(620.dp)
     )
 }
