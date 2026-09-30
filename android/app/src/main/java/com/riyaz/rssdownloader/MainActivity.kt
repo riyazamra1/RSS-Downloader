@@ -45,6 +45,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import android.webkit.WebView
 import android.webkit.WebViewClient
 
+private fun rssOnMain(block: () -> Unit) {
+    android.os.Handler(android.os.Looper.getMainLooper()).post(block)
+}
+
 class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
     private val api by lazy { NativeHostApi(BuildConfig.RSS_HOST_BASE_URL, BuildConfig.RSS_HOST_ACCESS_TOKEN.ifBlank { null }, prefs.getString("app_key", null)) }
@@ -191,13 +195,15 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         analysisError = null
         analyzing = true
         api.analyze(target) { result ->
-            result.onSuccess { value ->
-                analysis = value
-                preview = true
-                analyzing = false
-            }.onFailure {
-                analysisError = it.message ?: "Analysis failed"
-                analyzing = false
+            rssOnMain {
+                result.onSuccess { value ->
+                    analysis = value
+                    preview = true
+                    analyzing = false
+                }.onFailure {
+                    analysisError = it.message ?: "Analysis failed"
+                    analyzing = false
+                }
             }
         }
     }
@@ -207,7 +213,9 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         movieError = null
         val source = if (movieTab == 0) "tamil-movies" else "tamil-dubbed-movies"
         api.search(source, movieSearch) { result ->
-            result.onSuccess { movies = it }.onFailure { movieError = it.message ?: "Movie source error"; movies = emptyList() }
+            rssOnMain {
+                result.onSuccess { movies = it }.onFailure { movieError = it.message ?: "Movie source error"; movies = emptyList() }
+            }
         }
     }
 
@@ -417,8 +425,8 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                             when (action) {
                                 "RSS Core account" -> settingsDialog = "Account: " + prefs.getString("email", "Not signed in")
                                 "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
-                                "Download history" -> api.listDownloads { r -> r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } }
-                                "Premium" -> api.checkPremium(prefs.getString("email", "").orEmpty()) { r -> r.onSuccess { premiumText = if (it) "Premium is active." else "Premium is not active." }.onFailure { premiumText = it.message ?: "Premium status unavailable" } }
+                                "Download history" -> api.listDownloads { r -> rssOnMain { r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } } }
+                                "Premium" -> api.checkPremium(prefs.getString("email", "").orEmpty()) { r -> rssOnMain { r.onSuccess { premiumText = if (it) "Premium is active." else "Premium is not active." } .onFailure { premiumText = it.message ?: "Premium status unavailable" } } }
                                 "Connection" -> premiumText = if (api.configured()) "RSS Core is configured at ${BuildConfig.RSS_HOST_BASE_URL}" else "RSS Core is not configured."
                                 "Privacy Policy" -> openWebPage(context, "https://rsscore.cv/privacy")
                                 "Terms & Conditions" -> openWebPage(context, "https://rsscore.cv/terms")
@@ -559,7 +567,9 @@ private fun MovieLivePage(url: String) {
                 webViewClient = WebViewClient()
             }
         },
-        update = { it.loadUrl(url) },
+        update = { webView ->
+            if (webView.url != url) webView.loadUrl(url)
+        },
         modifier = Modifier.fillMaxWidth().height(620.dp)
     )
 }
