@@ -152,7 +152,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         drawerState = drawerState,
         drawerContent = {
             RssSlideMenu(
-                userName = prefs.getString("name", null),
+                userName = prefs.getString("display_name", prefs.getString("name", null)),
                 userEmail = prefs.getString("email", null),
                 selectedTitle = menuItems[tab].title,
                 items = menuItems.map { item ->
@@ -244,7 +244,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                             Button(
                                                 onClick = {
                                                     api.createDownload(result.requestId, option.id) {
-                                                        if (it.isSuccess) Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+                                                        it.onSuccess { Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() }
                                                     }
                                                 },
                                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
