@@ -40,6 +40,9 @@ import com.riyaz.rss.common.theme.RssTheme
 import com.riyaz.rss.common.navigation.RssMenuItem
 import com.riyaz.rss.common.navigation.RssSlideMenu
 import coil.compose.AsyncImage
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebView
+import android.webkit.WebViewClient
 
 class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("rss-downloader-license", MODE_PRIVATE) }
@@ -310,6 +313,12 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                 label = { Text("Search") }
                             )
                         }
+                        item {
+                            MovieLivePage(
+                                if (movieTab == 0) "https://moviezda.com/tamil-2026-movies/"
+                                else "https://isaidub.green/tamil-2026-dubbed-movies/"
+                            )
+                        }
                         movieError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
                         items(movies) { movie ->
                             Card(Modifier.fillMaxWidth().clickable { selectedMovie = movie }, shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
@@ -399,8 +408,12 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
             confirmButton = {
                 TextButton(onClick = {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl))
-                    if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
-                    else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
+                    runCatching {
+                        if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
+                        else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
+                    }.onFailure {
+                        Toast.makeText(context, "Unable to open source.", Toast.LENGTH_LONG).show()
+                    }
                     sourceDialogUrl = null
                 }) { Text("Open in browser") }
             },
@@ -419,8 +432,28 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
 
 private fun openWebPage(context: Context, url: String) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-    if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
-    else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
+    runCatching {
+        if (context.packageManager.resolveActivity(intent, 0) != null) context.startActivity(intent)
+        else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
+    }.onFailure {
+        Toast.makeText(context, "Unable to open page.", Toast.LENGTH_LONG).show()
+    }
+}
+
+@Composable
+private fun MovieLivePage(url: String) {
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.loadsImagesAutomatically = true
+                webViewClient = WebViewClient()
+                loadUrl(url)
+            }
+        },
+        modifier = Modifier.fillMaxWidth().height(620.dp)
+    )
 }
 
 @Composable
