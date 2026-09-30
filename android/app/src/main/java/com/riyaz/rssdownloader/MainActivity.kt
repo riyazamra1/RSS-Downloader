@@ -158,7 +158,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var settingsDialog by remember { mutableStateOf<String?>(null) }
     var historyJobs by remember { mutableStateOf<List<NativeHostApi.Job>?>(null) }
     var premiumText by remember { mutableStateOf<String?>(null) }
-    var sourceDialogUrl by remember { mutableStateOf<String?>(null) }
     var analyzing by remember { mutableStateOf(false) }
     var sourceWebView by remember { mutableStateOf<String?>(null) }
 
@@ -325,7 +324,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                         result.thumbnailUrl?.let { thumb -> AsyncImage(model = thumb, contentDescription = result.title, modifier = Modifier.fillMaxWidth().height(210.dp), contentScale = ContentScale.Crop) }
                                         Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                         Text(result.normalizedUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
-OutlinedButton(onClick = { sourceDialogUrl = result.normalizedUrl }, modifier = Modifier.fillMaxWidth()) {
+OutlinedButton(onClick = { sourceWebView = result.normalizedUrl }, modifier = Modifier.fillMaxWidth()) {
     Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(8.dp)); Text("Source")
 }
 if (result.mediaOptions.isEmpty()) Text("No authorized download options were returned for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -421,7 +420,7 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                         }
                         if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    4 -> item { SettingsContent(prefs, api, { themeDialog = true }, { aboutDialog = true }) { action ->
+                    4 -> item { SettingsContent(prefs, { themeDialog = true }, { aboutDialog = true }) { action ->
                             when (action) {
                                 "RSS Core account" -> settingsDialog = "Account: " + prefs.getString("email", "Not signed in")
                                 "Download location" -> runCatching { context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }.onFailure { Toast.makeText(context, "Storage picker unavailable", Toast.LENGTH_LONG).show() }
@@ -487,20 +486,6 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                 )
             },
             confirmButton = { TextButton(onClick = { settingsDialog = null }) { Text("Close") } }
-        )
-    }
-    sourceDialogUrl?.let { sourceUrl ->
-        AlertDialog(
-            onDismissRequest = { sourceDialogUrl = null },
-            title = { Text("Source") },
-            text = { Text(sourceUrl) },
-            confirmButton = {
-                TextButton(onClick = {
-                    sourceWebView = sourceUrl
-                    sourceDialogUrl = null
-                }) { Text("Open source") }
-            },
-            dismissButton = { TextButton(onClick = { sourceDialogUrl = null }) { Text("Cancel") } }
         )
     }
     sourceWebView?.let { pageUrl ->
@@ -612,7 +597,6 @@ private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, 
 @Composable
 private fun SettingsContent(
     prefs: android.content.SharedPreferences,
-    api: NativeHostApi,
     onTheme: () -> Unit,
     onAbout: () -> Unit,
     onSetting: (String) -> Unit
