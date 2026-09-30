@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.widget.Toast
 import android.content.Intent
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -68,6 +69,69 @@ class MainActivity : ComponentActivity() {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun queueAndDeliver(context: Context, api: NativeHostApi, requestId: String, optionId: String, label: String) {
+    api.createDownload(requestId, optionId) { result ->
+        result.onFailure { error -> Toast.makeText(context, error.message ?: "Download failed", Toast.LENGTH_LONG).show() }
+        result.onSuccess { job ->
+            Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+            fun poll(attempt: Int) {
+                if (attempt > 150) {
+                    Toast.makeText(context, "Download is still processing. Check Download history.", Toast.LENGTH_LONG).show()
+                    return
+                }
+                api.getDownload(job.jobId) { statusResult ->
+                    statusResult.onFailure { error -> Toast.makeText(context, error.message ?: "Download status unavailable", Toast.LENGTH_LONG).show() }
+                    statusResult.onSuccess { status ->
+                        val state = status.status.lowercase()
+                        if (state in listOf("completed", "complete", "ready", "success")) {
+                            val filename = status.filename?.takeIf { it.isNotBlank() } ?: label.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                            val mime = status.mimeType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                val values = android.content.ContentValues().apply {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                                    put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                                    put(MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/RSS Downloader")
+                                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                                }
+                                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                                if (uri == null) {
+                                    Toast.makeText(context, "Unable to create the download file.", Toast.LENGTH_LONG).show()
+                                    return@getDownload
+                                }
+                                try {
+                                    context.contentResolver.openOutputStream(uri)?.let { output ->
+                                        api.downloadFile(job.jobId, output) { fileResult ->
+                                            fileResult.onSuccess {
+                                                val done = android.content.ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+                                                context.contentResolver.update(uri, done, null, null)
+                                                Toast.makeText(context, "Download saved to Downloads/RSS Downloader", Toast.LENGTH_LONG).show()
+                                            }.onFailure {
+                                                context.contentResolver.delete(uri, null, null)
+                                                Toast.makeText(context, it.message ?: "File delivery failed", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    } ?: throw IllegalStateException("Unable to open the download file.")
+                                } catch (e: Exception) {
+                                    context.contentResolver.delete(uri, null, null)
+                                    Toast.makeText(context, e.message ?: "File delivery failed", Toast.LENGTH_LONG).show()
+                                }
+                            } else {
+                                Toast.makeText(context, "Download ready. Use Download history to save it.", Toast.LENGTH_LONG).show()
+                            }
+                        } else if (state in listOf("failed", "error", "cancelled", "canceled")) {
+                            Toast.makeText(context, status.error ?: "Download failed.", Toast.LENGTH_LONG).show()
+                        } else {
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ poll(attempt + 1) }, 2000)
+                        }
+                    }
+                }
+            }
+            poll(0)
+        }
+    }
+}
+
 @Composable
 private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPreferences) {
     val context = LocalContext.current
@@ -243,7 +307,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                         result.mediaOptions.forEach { option ->
                                             Button(
                                                 onClick = {
-                                                    api.createDownload(result.requestId, option.id) {
+                                                    queueAndDeliver(context, api, result.requestId, option.id, result.title)
                                                         it.onSuccess { Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() }
                                                     }
                                                 },
@@ -260,7 +324,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                         }
                     }
                     1 -> {
-                        item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") }); if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { api.createDownload(analysis!!.requestId, option.id) { r -> r.onSuccess { Toast.makeText(context, "Audio download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
+                        item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = "" }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") }); if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { queueAndDeliver(context, api, analysis!!.requestId, option.id, analysis!!.title) r -> r.onSuccess { Toast.makeText(context, "Audio download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
                     }
                     2 -> {
                         item {
@@ -287,7 +351,7 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                                 }
                                             }
                                             val selected = imageOptions.firstOrNull { it.format.equals(selectedImageFormat, true) } ?: imageOptions.first()
-                                            Button(onClick = { api.createDownload(analysis!!.requestId, selected.id) { r -> r.onSuccess { Toast.makeText(context, "Image download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) {
+                                            Button(onClick = { queueAndDeliver(context, api, analysis!!.requestId, selected.id, analysis!!.title) r -> r.onSuccess { Toast.makeText(context, "Image download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() } } }, modifier = Modifier.fillMaxWidth()) {
                                                 Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("Download Image")
                                             }
                                         } else Text("No downloadable image was found for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -477,7 +541,7 @@ private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, 
                 } else movie.mediaOptions.forEach { option ->
                     Button(
                         onClick = {
-                            api.createDownload(movie.requestId ?: movie.id, option.id) {
+                            queueAndDeliver(context, api, movie.requestId ?: movie.id, option.id, movie.title)
                                 if (it.isSuccess) Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
                             }
                         },
