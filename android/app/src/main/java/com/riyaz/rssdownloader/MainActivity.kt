@@ -132,6 +132,7 @@ private fun queueAndDeliver(context: Context, api: NativeHostApi, requestId: Str
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPreferences) {
     val context = LocalContext.current
@@ -308,8 +309,6 @@ if (result.mediaOptions.isEmpty()) Text("No authorized download options were ret
                                             Button(
                                                 onClick = {
                                                     queueAndDeliver(context, api, result.requestId, option.id, result.title)
-                                                        it.onSuccess { Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show() }.onFailure { Toast.makeText(context, it.message ?: "Download failed", Toast.LENGTH_LONG).show() }
-                                                    }
                                                 },
                                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                                             ) {
@@ -542,8 +541,6 @@ private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, 
                     Button(
                         onClick = {
                             queueAndDeliver(context, api, movie.requestId ?: movie.id, option.id, movie.title)
-                                if (it.isSuccess) Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
-                            }
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
