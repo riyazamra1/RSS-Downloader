@@ -155,6 +155,8 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var historyJobs by remember { mutableStateOf<List<NativeHostApi.Job>?>(null) }
     var premiumText by remember { mutableStateOf<String?>(null) }
     var sourceDialogUrl by remember { mutableStateOf<String?>(null) }
+    var analyzing by remember { mutableStateOf(false) }
+    var sourceWebView by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -177,15 +179,25 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         onDispose { clipboard.removePrimaryClipChangedListener(listener) }
     }
 
-    LaunchedEffect(url) {
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            kotlinx.coroutines.delay(500)
-            if (url == lastAnalyzed) return@LaunchedEffect
-            lastAnalyzed = url
-            analysis = null
-            analysisError = null
-            api.analyze(url) { result ->
-                result.onSuccess { analysis = it; preview = true }.onFailure { analysisError = it.message ?: "Analysis failed" }
+    fun analyzeNow() {
+        val target = url.trim()
+        if (!target.startsWith("http://") && !target.startsWith("https://")) {
+            analysisError = "Enter or paste a valid URL first."
+            return
+        }
+        lastAnalyzed = target
+        analysis = null
+        preview = false
+        analysisError = null
+        analyzing = true
+        api.analyze(target) { result ->
+            result.onSuccess { value ->
+                analysis = value
+                preview = true
+                analyzing = false
+            }.onFailure {
+                analysisError = it.message ?: "Analysis failed"
+                analyzing = false
             }
         }
     }
@@ -284,6 +296,12 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                         leadingIcon = { Icon(Icons.Default.Link, null) },
                                         label = { Text("Paste URL") }
                                     )
+                                    Spacer(Modifier.height(10.dp))
+                                    Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled = !analyzing) {
+                                        Icon(Icons.Default.Search, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(if (analyzing) "Analyzing…" else "Analyze")
+                                    }
                                     if (url.isNotBlank() && url.startsWith("http")) {
                                         Spacer(Modifier.height(8.dp))
                                         Text(if (analysis != null) "Preview ready" else (analysisError ?: "Analyzing…"))
@@ -572,7 +590,7 @@ private fun SettingsContent(
         }
         Card(shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
             Column {
-                RssSettingRow(Icons.Default.DarkMode, "Theme", prefs.getString("theme", "System default"), Modifier.clickable { onTheme() })
+                RssSettingRow(Icons.Default.DarkMode, "Appearance", prefs.getString("theme", "System default"), Modifier.clickable { onTheme() })
                 Divider()
                 RssSettingRow(Icons.Default.WorkspacePremium, "Premium", "RSS Core entitlement", Modifier.clickable { onSetting("Premium") })
                 Divider()
