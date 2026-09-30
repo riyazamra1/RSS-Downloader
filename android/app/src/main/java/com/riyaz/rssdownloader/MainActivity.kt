@@ -74,16 +74,16 @@ class MainActivity : ComponentActivity() {
 
 private fun queueAndDeliver(context: Context, api: NativeHostApi, requestId: String, optionId: String, label: String) {
     api.createDownload(requestId, optionId) { result ->
-        result.onFailure { error -> Toast.makeText(context, error.message ?: "Download failed", Toast.LENGTH_LONG).show() }
+        result.onFailure { error -> rssOnMain { Toast.makeText(context, error.message ?: "Download failed", Toast.LENGTH_LONG).show() } }
         result.onSuccess { job ->
-            Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+            rssOnMain { Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show() }
             fun poll(attempt: Int) {
                 if (attempt > 150) {
-                    Toast.makeText(context, "Download is still processing. Check Download history.", Toast.LENGTH_LONG).show()
+                    rssOnMain { Toast.makeText(context, "Download is still processing. Check Download history.", Toast.LENGTH_LONG).show() }
                     return
                 }
                 api.getDownload(job.jobId) { statusResult ->
-                    statusResult.onFailure { error -> Toast.makeText(context, error.message ?: "Download status unavailable", Toast.LENGTH_LONG).show() }
+                    statusResult.onFailure { error -> rssOnMain { Toast.makeText(context, error.message ?: "Download status unavailable", Toast.LENGTH_LONG).show() } }
                     statusResult.onSuccess { status ->
                         val state = status.status.lowercase()
                         if (state in listOf("completed", "complete", "ready", "success")) {
@@ -98,7 +98,7 @@ private fun queueAndDeliver(context: Context, api: NativeHostApi, requestId: Str
                                 }
                                 val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                                 if (uri == null) {
-                                    Toast.makeText(context, "Unable to create the download file.", Toast.LENGTH_LONG).show()
+                                    rssOnMain { Toast.makeText(context, "Unable to create the download file.", Toast.LENGTH_LONG).show() }
                                     return@getDownload
                                 }
                                 try {
@@ -107,22 +107,22 @@ private fun queueAndDeliver(context: Context, api: NativeHostApi, requestId: Str
                                             fileResult.onSuccess {
                                                 val done = android.content.ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
                                                 context.contentResolver.update(uri, done, null, null)
-                                                Toast.makeText(context, "Download saved to Downloads/RSS Downloader", Toast.LENGTH_LONG).show()
+                                                rssOnMain { Toast.makeText(context, "Download saved to Downloads/RSS Downloader", Toast.LENGTH_LONG).show() }
                                             }.onFailure {
                                                 context.contentResolver.delete(uri, null, null)
-                                                Toast.makeText(context, it.message ?: "File delivery failed", Toast.LENGTH_LONG).show()
+                                                rssOnMain { Toast.makeText(context, it.message ?: "File delivery failed", Toast.LENGTH_LONG).show() }
                                             }
                                         }
                                     } ?: throw IllegalStateException("Unable to open the download file.")
                                 } catch (e: Exception) {
                                     context.contentResolver.delete(uri, null, null)
-                                    Toast.makeText(context, e.message ?: "File delivery failed", Toast.LENGTH_LONG).show()
+                                    rssOnMain { Toast.makeText(context, e.message ?: "File delivery failed", Toast.LENGTH_LONG).show() }
                                 }
                             } else {
-                                Toast.makeText(context, "Download ready. Use Download history to save it.", Toast.LENGTH_LONG).show()
+                                rssOnMain { Toast.makeText(context, "Download ready. Use Download history to save it.", Toast.LENGTH_LONG).show() }
                             }
                         } else if (state in listOf("failed", "error", "cancelled", "canceled")) {
-                            Toast.makeText(context, status.error ?: "Download failed.", Toast.LENGTH_LONG).show()
+                            rssOnMain { Toast.makeText(context, status.error ?: "Download failed.", Toast.LENGTH_LONG).show() }
                         } else {
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ poll(attempt + 1) }, 2000)
                         }
@@ -166,7 +166,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         while (true) {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
-            if ((value.startsWith("http://") || value.startsWith("https://")) && value != url) url = value
+            if ((value.startsWith("http://") || value.startsWith("https://")) && value != url) { url = value; analysis = null; analysisError = null; preview = false; lastAnalyzed = ""; analyzing = false }
             kotlinx.coroutines.delay(700)
         }
     }
@@ -175,7 +175,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         fun readClipboard() {
             val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
-            if (value.startsWith("http://") || value.startsWith("https://")) url = value
+            if (value.startsWith("http://") || value.startsWith("https://")) { url = value; analysis = null; analysisError = null; preview = false; lastAnalyzed = ""; analyzing = false }
         }
         readClipboard()
         val listener = ClipboardManager.OnPrimaryClipChangedListener { readClipboard() }
