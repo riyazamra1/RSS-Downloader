@@ -10,10 +10,6 @@
         android:icon="@drawable/rss_downloader_logo"
         android:roundIcon="@drawable/rss_downloader_logo"
         android:usesCleartextTraffic="false">
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
-
         <activity android:name=".LicenseOnboardingActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
