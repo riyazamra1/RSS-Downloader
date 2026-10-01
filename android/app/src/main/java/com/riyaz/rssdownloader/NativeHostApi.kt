@@ -141,8 +141,31 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         deliver(callback, runCatching { requestObject("/api/v1/payments/orders/" + enc(orderId), "GET", null) })
     }
 
-    private fun mediaOptions(array: JSONArray?): List<MediaOption> {\n        if (array == null) return emptyList()\n        return buildList {\n            for (i in 0 until array.length()) {\n                val o = array.optJSONObject(i) ?: continue\n                val id = o.optString("id").ifBlank { o.optString("mediaOptionId").ifBlank { o.optString("optionId").ifBlank { o.optString("option_id") } } }\n                if (id.isBlank()) continue\n                val kind = o.optString("kind").ifBlank { o.optString("type").ifBlank { o.optString("mediaType", "media") } }\n                val format = o.optString("format").ifBlank { o.optString("extension").ifBlank { o.optString("ext") } }\n                val quality = o.optString("quality").ifBlank { o.optString("resolution").ifBlank { null } }\n                val size = if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else if (o.has("size_bytes") && !o.isNull("size_bytes")) o.optLong("size_bytes") else null\n                val width = if (o.has("width") && !o.isNull("width")) o.optInt("width") else null\n                val height = if (o.has("height") && !o.isNull("height")) o.optInt("height") else null\n                add(MediaOption(id, kind, format, quality, size, width, height))\n            }\n        }\n    }
-    private fun parseJob(o: JSONObject): Job {\n        val jobId = o.optString("jobId").ifBlank { o.optString("job_id") }\n        val status = o.optString("status").ifBlank { o.optString("state", "unknown") }\n        val progress = if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else if (o.has("progress_percent") && !o.isNull("progress_percent")) o.optDouble("progress_percent").toInt() else null\n        val mediaKind = o.optString("mediaKind").ifBlank { o.optString("media_kind").ifBlank { o.optString("kind").ifBlank { null } } }\n        val filename = o.optString("filename").ifBlank { o.optString("outputName").ifBlank { o.optString("output_name").ifBlank { null } } }\n        return Job(jobId, status, progress, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { o.optString("thumbnail_url", "").ifBlank { null } }, mediaKind, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes") ?: longOrNull(o, "downloaded_bytes"), longOrNull(o, "totalBytes") ?: longOrNull(o, "total_bytes"), longOrNull(o, "speedBytesPerSecond") ?: longOrNull(o, "speed_bytes_per_second"), longOrNull(o, "etaSeconds") ?: longOrNull(o, "eta_seconds"), o.optString("error", "").ifBlank { null }, filename, o.optString("mimeType", "").ifBlank { o.optString("mime_type", "").ifBlank { null } })\n    }
+    private fun mediaOptions(array: JSONArray?): List<MediaOption> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (i in 0 until array.length()) {
+                val o = array.optJSONObject(i) ?: continue
+                val id = o.optString("id").ifBlank { o.optString("mediaOptionId").ifBlank { o.optString("optionId").ifBlank { o.optString("option_id") } } }
+                if (id.isBlank()) continue
+                val kind = o.optString("kind").ifBlank { o.optString("type").ifBlank { o.optString("mediaType", "media") } }
+                val format = o.optString("format").ifBlank { o.optString("extension").ifBlank { o.optString("ext") } }
+                val quality = o.optString("quality").ifBlank { o.optString("resolution").ifBlank { null } }
+                val size = if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else if (o.has("size_bytes") && !o.isNull("size_bytes")) o.optLong("size_bytes") else null
+                val width = if (o.has("width") && !o.isNull("width")) o.optInt("width") else null
+                val height = if (o.has("height") && !o.isNull("height")) o.optInt("height") else null
+                add(MediaOption(id, kind, format, quality, size, width, height))
+            }
+        }
+    }
+    private fun parseJob(o: JSONObject): Job {
+        val jobId = o.optString("jobId").ifBlank { o.optString("job_id") }
+        val status = o.optString("status").ifBlank { o.optString("state", "unknown") }
+        val progress = if (o.has("progressPercent") && !o.isNull("progressPercent")) o.optDouble("progressPercent").toInt() else if (o.has("progress_percent") && !o.isNull("progress_percent")) o.optDouble("progress_percent").toInt() else null
+        val mediaKind = o.optString("mediaKind").ifBlank { o.optString("media_kind").ifBlank { o.optString("kind").ifBlank { null } } }
+        val filename = o.optString("filename").ifBlank { o.optString("outputName").ifBlank { o.optString("output_name").ifBlank { null } } }
+        return Job(jobId, status, progress, o.optString("title", "").ifBlank { null }, o.optString("thumbnailUrl", "").ifBlank { o.optString("thumbnail_url", "").ifBlank { null } }, mediaKind, o.optString("quality", "").ifBlank { null }, o.optString("format", "").ifBlank { null }, longOrNull(o, "downloadedBytes") ?: longOrNull(o, "downloaded_bytes"), longOrNull(o, "totalBytes") ?: longOrNull(o, "total_bytes"), longOrNull(o, "speedBytesPerSecond") ?: longOrNull(o, "speed_bytes_per_second"), longOrNull(o, "etaSeconds") ?: longOrNull(o, "eta_seconds"), o.optString("error", "").ifBlank { null }, filename, o.optString("mimeType", "").ifBlank { o.optString("mime_type", "").ifBlank { null } })
+    }
     private fun numberOrNull(o: JSONObject, key: String): Double? = if (o.has(key) && !o.isNull(key)) o.optDouble(key) else null
     private fun longOrNull(o: JSONObject, key: String): Long? = if (o.has(key) && !o.isNull(key)) o.optLong(key) else null
     private fun jsonStringList(a: JSONArray?): List<String> = if (a == null) emptyList() else buildList { for (i in 0 until a.length()) add(a.optString(i)) }
