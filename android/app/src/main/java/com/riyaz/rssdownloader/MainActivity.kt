@@ -204,15 +204,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         }
     }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
-            if ((value.startsWith("http://") || value.startsWith("https://")) && value != url) { url = value; analysis = null; analysisError = null; preview = false; lastAnalyzed = ""; analyzing = false }
-            kotlinx.coroutines.delay(700)
-        }
-    }
-
     DisposableEffect(Unit) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         fun readClipboard() {
@@ -250,6 +241,15 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                     analyzing = false
                 }
             }
+        }
+    }
+
+    LaunchedEffect(tab) {
+        if (tab != 0) {
+            analysis = null
+            analysisError = null
+            preview = false
+            analyzing = false
         }
     }
 
@@ -343,7 +343,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                 Column(Modifier.padding(16.dp)) {
                                     OutlinedTextField(
                                         value = url,
-                                        onValueChange = { url = it.trim(); lastAnalyzed = "" },
+                                        onValueChange = { url = it.trim(); lastAnalyzed = ""; analysis = null; analysisError = null; preview = false },
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true,
                                         leadingIcon = { Icon(Icons.Default.Link, null) },
