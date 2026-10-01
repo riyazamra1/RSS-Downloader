@@ -57,7 +57,22 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         }
     }) }
     fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { parseJob(requestObject("/api/downloader/download", "POST", JSONObject().put("requestId", requestId).put("mediaOptionId", optionId).put("authorizationApproved", true))) }) }
-    fun getDownload(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { val json = requestObject("/api/downloader/downloads/${enc(jobId)}", "GET", null); val jobs = json.optJSONArray("jobs"); if (jobs != null) { (0 until jobs.length()).asSequence().map { jobs.getJSONObject(it) }.firstOrNull { it.optString("jobId") == jobId }?.let(::parseJob) ?: throw IllegalStateException("Download job not found.") } else parseJob(json) }) }
+    fun getDownload(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching {
+        runCatching {
+            val json = requestObject("/api/downloader/downloads/${enc(jobId)}", "GET", null)
+            val jobs = json.optJSONArray("jobs")
+            if (jobs != null) {
+                (0 until jobs.length()).asSequence().map { jobs.getJSONObject(it) }.firstOrNull { it.optString("jobId").ifBlank { it.optString("job_id") } == jobId }?.let(::parseJob)
+                    ?: throw IllegalStateException("Download job not found.")
+            } else parseJob(json)
+        }.getOrElse {
+            val list = requestObject("/api/downloader/downloads", "GET", null).optJSONArray("jobs") ?: throw it
+            (0 until list.length()).asSequence().map { list.getJSONObject(it) }
+                .firstOrNull { it.optString("jobId").ifBlank { it.optString("job_id") } == jobId }
+                ?.let(::parseJob)
+                ?: throw IllegalStateException("Download job not found.")
+        }
+    }) }
 
     fun listDownloads(callback: (Result<List<Job>>) -> Unit) = executor.execute { deliver(callback, runCatching { val a = requestObject("/api/downloader/downloads", "GET", null).optJSONArray("jobs") ?: JSONArray(); buildList { for (i in 0 until a.length()) add(parseJob(a.getJSONObject(i))) } }) }
     fun cancel(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { parseJob(requestObject("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) }) }
