@@ -47,6 +47,9 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.viewinterop.AndroidView
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 private fun rssOnMain(block: () -> Unit) {
     android.os.Handler(android.os.Looper.getMainLooper()).post(block)
@@ -204,16 +207,31 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         }
     }
 
-    DisposableEffect(Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         fun readClipboard() {
             val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
-            if (value.startsWith("http://") || value.startsWith("https://")) { url = value; analysis = null; analysisError = null; preview = false; lastAnalyzed = ""; analyzing = false }
+            if ((value.startsWith("http://") || value.startsWith("https://")) && value != url.trim()) {
+                url = value
+                analysis = null
+                analysisError = null
+                preview = false
+                lastAnalyzed = ""
+                analyzing = false
+            }
         }
         readClipboard()
         val listener = ClipboardManager.OnPrimaryClipChangedListener { readClipboard() }
         clipboard.addPrimaryClipChangedListener(listener)
-        onDispose { clipboard.removePrimaryClipChangedListener(listener) }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) readClipboard()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            clipboard.removePrimaryClipChangedListener(listener)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     fun analyzeNow() {
@@ -230,12 +248,24 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         api.analyze(target) { result ->
             rssOnMain {
                 result.onSuccess { value ->
-                    analysis = value
-                    preview = true
-                    analyzing = false
-                    value.mediaOptions.firstOrNull { it.kind.equals("image", true) }?.format
-                        ?.takeIf { it.isNotBlank() }
-                        ?.let { selectedImageFormat = it.uppercase() }
+                    fun finish(options: List<NativeHostApi.MediaOption>) {
+                        analysis = value.copy(mediaOptions = options)
+                        preview = true
+                        analyzing = false
+                        options.firstOrNull { it.kind.equals("image", true) }?.format
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { selectedImageFormat = it.uppercase() }
+                    }
+                    if (value.mediaOptions.isNotEmpty() || value.requestId.isBlank()) {
+                        finish(value.mediaOptions)
+                    } else {
+                        api.listMediaOptions(value.requestId) { optionsResult ->
+                            rssOnMain {
+                                optionsResult.onSuccess { finish(it) }
+                                    .onFailure { finish(value.mediaOptions) }
+                            }
+                        }
+                    }
                 }.onFailure {
                     analysisError = it.message ?: "Analysis failed"
                     analyzing = false
@@ -447,20 +477,24 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                                 label = { Text("Search") }
                             )
                         }
-                        item {
-                            MovieLivePage(
-                                if (movieTab == 0) "https://moviezda.com/tamil-2026-movies/"
-                                else "https://isaidub.green/tamil-2026-dubbed-movies/"
-                            )
-                        }
                         movieError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
                         items(movies) { movie ->
-                            Card(Modifier.fillMaxWidth().clickable { selectedMovie = movie }, shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                 Column(Modifier.padding(16.dp)) {
                                     Text(movie.title, fontWeight = FontWeight.Bold)
                                     val meta = listOfNotNull(movie.year?.toString(), movie.language, movie.releaseDate).joinToString(" • ")
                                     if (meta.isNotBlank()) Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("Details  ›", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+                                    movie.mediaOptions.forEach { option ->
+                                        Button(
+                                            onClick = { queueAndDeliver(context, api, prefs, movie.requestId ?: movie.id, option.id, movie.title) },
+                                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                                        ) {
+                                            Icon(Icons.Default.Download, null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("${option.format.ifBlank { "Download" }.uppercase()} • ${option.quality ?: "Available"}")
+                                        }
+                                    }
+                                    TextButton(onClick = { selectedMovie = movie }) { Text("Details") }
                                 }
                             }
                         }
