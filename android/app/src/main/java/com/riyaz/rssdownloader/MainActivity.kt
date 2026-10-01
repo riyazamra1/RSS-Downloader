@@ -225,6 +225,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                 preview = false
                 lastAnalyzed = ""
                 analyzing = false
+                analyzeNow(value)
             }
         }
         readClipboard()
@@ -254,6 +255,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             preview = false
             lastAnalyzed = ""
             analyzing = false
+            analyzeNow(value)
         }
     }
 
@@ -267,14 +269,15 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             preview = false
             lastAnalyzed = ""
             analyzing = false
-            Toast.makeText(context, "URL pasted from clipboard", Toast.LENGTH_SHORT).show()
+            analyzeNow(value)
+            Toast.makeText(context, "URL pasted and analysis started", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(context, "No HTTP/HTTPS URL found in clipboard", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun analyzeNow() {
-        val target = url.trim()
+    fun analyzeNow(inputUrl: String = url) {
+        val target = inputUrl.trim()
         if (!target.startsWith("http://") && !target.startsWith("https://")) {
             analysisError = "Enter or paste a valid URL first."
             return
