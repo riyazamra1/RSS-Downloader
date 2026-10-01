@@ -47,7 +47,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.7.6")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.biometric:biometric:1.1.0")
-    implementation("com.google.android.gms:play-services-ads:24.6.0")
     implementation("com.android.billingclient:billing-ktx:8.0.0")
 }
 
