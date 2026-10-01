@@ -183,7 +183,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var analysisError by remember { mutableStateOf<String?>(null) }
     var movies by remember { mutableStateOf<List<NativeHostApi.SearchResult>>(emptyList()) }
     var movieError by remember { mutableStateOf<String?>(null) }
-    var selectedMovie by remember { mutableStateOf<NativeHostApi.SearchResult?>(null) }
     var themeDialog by remember { mutableStateOf(false) }
     var aboutDialog by remember { mutableStateOf(false) }
     var lastAnalyzed by remember { mutableStateOf("") }
@@ -298,16 +297,15 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         }
     }
 
-    BackHandler(enabled = selectedMovie != null) { selectedMovie = null }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val menuItems = listOf(
-        RssMenuItem("Social Downloader", Icons.Default.Share) { tab = 0; selectedMovie = null },
-        RssMenuItem("Audio Downloader", Icons.Default.Audiotrack) { tab = 1; selectedMovie = null },
-        RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 2; selectedMovie = null },
-        RssMenuItem("Movies", Icons.Default.Movie) { tab = 3; selectedMovie = null },
-        RssMenuItem("Settings", Icons.Default.Settings) { tab = 4; selectedMovie = null }
+        RssMenuItem("Social Downloader", Icons.Default.Share) { tab = 0 },
+        RssMenuItem("Audio Downloader", Icons.Default.Audiotrack) { tab = 1 },
+        RssMenuItem("Image Downloader", Icons.Default.Image) { tab = 2 },
+        RssMenuItem("Movies", Icons.Default.Movie) { tab = 3 },
+        RssMenuItem("Settings", Icons.Default.Settings) { tab = 4 }
     )
 
     ModalNavigationDrawer(
@@ -354,7 +352,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                     menuItems.forEachIndexed { index, item ->
                         NavigationBarItem(
                             selected = tab == index,
-                            onClick = { tab = index; selectedMovie = null },
+                            onClick = { tab = index },
                             icon = { Icon(item.icon, contentDescription = item.title) },
                             label = { Text(item.title.removeSuffix(" Downloader")) }
                         )
@@ -367,10 +365,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (selectedMovie != null) {
-                item { MovieDetails(selectedMovie!!, api, prefs) { selectedMovie = null } }
-            } else {
-                when (tab) {
+            when (tab) {
                     0 -> {
                         item {
                             Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
@@ -523,7 +518,6 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                                             Text("${option.format.ifBlank { "Download" }.uppercase()} • ${option.quality ?: "Available"}")
                                         }
                                     }
-                                    TextButton(onClick = { selectedMovie = movie }) { Text("Details") }
                                 }
                             }
                         }
@@ -542,7 +536,6 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                             }
                         } }
                 }
-            }
         }
     }
     }
