@@ -31,6 +31,19 @@ workflows:
           gradle --version
           gradle --no-daemon --stacktrace :app:assembleDebug
 
+      - name: Verify APK artifact
+        script: |
+          set -e
+          APK="$CM_BUILD_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          AAPT2=$(find "$ANDROID_SDK_ROOT/build-tools" -name aapt2 -type f | sort -V | tail -n 1)
+          test -x "$AAPT2"
+          BADGING="$("$AAPT2" dump badging "$APK")"
+          echo "$BADGING" | grep -F "package: name='com.riyaz.rssdownloader'"
+          echo "$BADGING" | grep -F "versionCode='3'"
+          echo "$BADGING" | grep -F "versionName='3.2'"
+          echo "RSS Downloader APK artifact verification passed."
+
     artifacts:
       - android/app/build/outputs/apk/debug/*.apk
 
