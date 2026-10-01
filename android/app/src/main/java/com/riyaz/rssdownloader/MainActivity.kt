@@ -175,6 +175,10 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var imageSizeExpanded by remember { mutableStateOf(false) }
     var selectedImageFormat by remember { mutableStateOf("Original") }
     var selectedImageSize by remember { mutableStateOf("Original") }
+    var selectedSocialFormat by remember { mutableStateOf("") }
+    var selectedSocialQuality by remember { mutableStateOf("") }
+    var socialFormatExpanded by remember { mutableStateOf(false) }
+    var socialQualityExpanded by remember { mutableStateOf(false) }
         var movieTab by remember { mutableIntStateOf(0) }
     var movieSearch by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
@@ -255,6 +259,10 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                         options.firstOrNull { it.kind.equals("image", true) }?.format
                             ?.takeIf { it.isNotBlank() }
                             ?.let { selectedImageFormat = it.uppercase() }
+                        options.firstOrNull()?.let {
+                            selectedSocialFormat = it.format.ifBlank { "Original" }.uppercase()
+                            selectedSocialQuality = it.quality.orEmpty()
+                        }
                     }
                     if (value.mediaOptions.isNotEmpty() || value.requestId.isBlank()) {
                         finish(value.mediaOptions)
@@ -403,20 +411,48 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
 OutlinedButton(onClick = { sourceWebView = result.normalizedUrl }, modifier = Modifier.fillMaxWidth()) {
     Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(8.dp)); Text("Source")
 }
-if (result.mediaOptions.isEmpty()) Text("No authorized download options were returned for this link.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        result.mediaOptions.forEach { option ->
+if (result.mediaOptions.isEmpty()) {
+                                            Text("No download options returned by RSS Core.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        } else {
+                                            val formats = result.mediaOptions.map { it.format.ifBlank { "Original" }.uppercase() }.distinct()
+                                            val formatOptions = result.mediaOptions.filter { it.format.ifBlank { "Original" }.uppercase() == selectedSocialFormat }
+                                            val qualities = formatOptions.mapNotNull { it.quality?.takeIf { q -> q.isNotBlank() } }.distinct()
+                                            val selected = formatOptions.firstOrNull { it.quality.orEmpty() == selectedSocialQuality } ?: formatOptions.firstOrNull() ?: result.mediaOptions.first()
+                                            Box {
+                                                OutlinedButton(onClick = { socialFormatExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                                    Text("Format: ${selected.format.ifBlank { "Original" }.uppercase()}")
+                                                }
+                                                DropdownMenu(expanded = socialFormatExpanded, onDismissRequest = { socialFormatExpanded = false }) {
+                                                    formats.forEach { format ->
+                                                        DropdownMenuItem(text = { Text(format) }, onClick = {
+                                                            selectedSocialFormat = format
+                                                            selectedSocialQuality = result.mediaOptions.firstOrNull { it.format.ifBlank { "Original" }.uppercase() == format }?.quality.orEmpty()
+                                                            socialFormatExpanded = false
+                                                        })
+                                                    }
+                                                }
+                                            }
+                                            if (qualities.isNotEmpty()) {
+                                                Box {
+                                                    OutlinedButton(onClick = { socialQualityExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                                        Text("Quality: ${selected.quality ?: "Available"}")
+                                                    }
+                                                    DropdownMenu(expanded = socialQualityExpanded, onDismissRequest = { socialQualityExpanded = false }) {
+                                                        qualities.forEach { quality ->
+                                                            DropdownMenuItem(text = { Text(quality) }, onClick = { selectedSocialQuality = quality; socialQualityExpanded = false })
+                                                        }
+                                                    }
+                                                }
+                                            }
                                             Button(
-                                                onClick = {
-                                                    queueAndDeliver(context, api, prefs, result.requestId, option.id, result.title)
-                                                },
+                                                onClick = { queueAndDeliver(context, api, prefs, result.requestId, selected.id, result.title) },
                                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                                             ) {
                                                 Icon(Icons.Default.Download, null)
                                                 Spacer(Modifier.width(8.dp))
-                                                Text(if (option.kind.equals("image", ignoreCase = true)) "Download Original Image • ${option.format.uppercase()}" else "${option.format.uppercase()} • ${option.quality ?: "Available"}")
+                                                Text("Download ${selected.format.ifBlank { "Original" }.uppercase()} • ${selected.quality ?: "Available"}")
                                             }
-                                        }
-                                    }
+                                        }                                    }
                                 }
                             }
                         }
