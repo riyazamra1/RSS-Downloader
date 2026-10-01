@@ -334,7 +334,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (selectedMovie != null) {
-                item { MovieDetails(selectedMovie!!, api) { selectedMovie = null } }
+                item { MovieDetails(selectedMovie!!, api, prefs) { selectedMovie = null } }
             } else {
                 when (tab) {
                     0 -> {
@@ -626,7 +626,7 @@ private fun MovieLivePage(url: String) {
 }
 
 @Composable
-private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, onBack: () -> Unit) {
+private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, prefs: android.content.SharedPreferences, onBack: () -> Unit) {
     val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = onBack) { Text("‹ Movies") }
