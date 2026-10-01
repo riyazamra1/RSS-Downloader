@@ -597,41 +597,6 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
             confirmButton = { TextButton(onClick = { settingsDialog = null }) { Text("Close") } }
         )
     }
-    sourceWebView?.let { pageUrl ->
-        AlertDialog(
-            onDismissRequest = { sourceWebView = null },
-            title = { Text("Source") },
-            text = {
-                AndroidView(
-                    factory = { context ->
-                        WebView(context).apply {
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.loadsImagesAutomatically = true
-                            settings.setSupportZoom(true)
-                            settings.builtInZoomControls = true
-                            settings.displayZoomControls = false
-                            setBackgroundColor(android.graphics.Color.WHITE)
-                            webViewClient = WebViewClient()
-                            setOnTouchListener { view, event ->
-                                if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN ||
-                                    event.actionMasked == android.view.MotionEvent.ACTION_MOVE) {
-                                    view.parent?.requestDisallowInterceptTouchEvent(true)
-                                } else if (event.actionMasked == android.view.MotionEvent.ACTION_UP ||
-                                    event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
-                                    view.parent?.requestDisallowInterceptTouchEvent(false)
-                                }
-                                false
-                            }
-                            loadUrl(pageUrl)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(560.dp)
-                )
-            },
-            confirmButton = { TextButton(onClick = { sourceWebView = null }) { Text("Close") } }
-        )
-    }
     if (aboutDialog) {
         AlertDialog(
             onDismissRequest = { aboutDialog = false },
