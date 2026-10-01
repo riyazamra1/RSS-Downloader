@@ -22,6 +22,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -183,6 +184,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var analysisError by remember { mutableStateOf<String?>(null) }
     var movies by remember { mutableStateOf<List<NativeHostApi.SearchResult>>(emptyList()) }
     var movieError by remember { mutableStateOf<String?>(null) }
+    var movieLoading by remember { mutableStateOf(false) }
     var themeDialog by remember { mutableStateOf(false) }
     var aboutDialog by remember { mutableStateOf(false) }
     var lastAnalyzed by remember { mutableStateOf("") }
@@ -230,6 +232,23 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         onDispose {
             clipboard.removePrimaryClipChangedListener(listener)
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Some Android 12/13 devices deliver clipboard state slightly after the first
+    // composition. A one-shot foreground retry makes copied links paste reliably
+    // without polling the clipboard continuously.
+    LaunchedEffect(Unit) {
+        delay(300)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
+        if ((value.startsWith("http://") || value.startsWith("https://")) && value != url.trim()) {
+            url = value
+            analysis = null
+            analysisError = null
+            preview = false
+            lastAnalyzed = ""
+            analyzing = false
         }
     }
 
@@ -289,10 +308,19 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     LaunchedEffect(tab, movieTab, movieSearch) {
         if (tab != 3) return@LaunchedEffect
         movieError = null
+        movieLoading = true
+        movies = emptyList()
         val source = if (movieTab == 0) "tamil-movies" else "tamil-dubbed-movies"
         api.search(source, movieSearch) { result ->
             rssOnMain {
-                result.onSuccess { movies = it }.onFailure { movieError = it.message ?: "Movie source error"; movies = emptyList() }
+                result.onSuccess {
+                    movies = it
+                    movieLoading = false
+                }.onFailure {
+                    movieError = it.message ?: "Movie source error"
+                    movies = emptyList()
+                    movieLoading = false
+                }
             }
         }
     }
@@ -521,7 +549,8 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                                 }
                             }
                         }
-                        if (movies.isEmpty() && movieError == null) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        if (movieLoading) item { Text("Loading catalogue…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        else if (movies.isEmpty() && movieError == null) item { Text("No movies found for this category.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                     4 -> item { SettingsContent(prefs, { themeDialog = true }, { aboutDialog = true }) { action ->
                             when (action) {
