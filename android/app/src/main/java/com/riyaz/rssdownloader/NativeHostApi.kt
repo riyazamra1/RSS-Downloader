@@ -48,7 +48,14 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         })
     }
 
-    fun listMediaOptions(requestId: String, callback: (Result<List<MediaOption>>) -> Unit) = executor.execute { deliver(callback, runCatching { mediaOptions(JSONArray(requestText("/api/downloader/media-options/${enc(requestId)}", "GET", null))) }) }
+    fun listMediaOptions(requestId: String, callback: (Result<List<MediaOption>>) -> Unit) = executor.execute { deliver(callback, runCatching {
+        val raw = requestText("/api/downloader/media-options/${enc(requestId)}", "GET", null)
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("[")) mediaOptions(JSONArray(trimmed)) else {
+            val json = JSONObject(trimmed)
+            mediaOptions(json.optJSONArray("mediaOptions") ?: json.optJSONArray("downloadOptions") ?: json.optJSONArray("formats") ?: json.optJSONArray("options") ?: json.optJSONArray("items"))
+        }
+    }) }
     fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { parseJob(requestObject("/api/downloader/download", "POST", JSONObject().put("requestId", requestId).put("mediaOptionId", optionId).put("authorizationApproved", true))) }) }
     fun getDownload(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { val json = requestObject("/api/downloader/downloads/${enc(jobId)}", "GET", null); val jobs = json.optJSONArray("jobs"); if (jobs != null) { (0 until jobs.length()).asSequence().map { jobs.getJSONObject(it) }.firstOrNull { it.optString("jobId") == jobId }?.let(::parseJob) ?: throw IllegalStateException("Download job not found.") } else parseJob(json) }) }
 
