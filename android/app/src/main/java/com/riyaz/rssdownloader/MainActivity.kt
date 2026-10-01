@@ -76,11 +76,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun queueAndDeliver(context: Context, api: NativeHostApi, prefs: android.content.SharedPreferences, requestId: String, optionId: String, label: String) {
+private fun queueAndDeliver(context: Context, api: NativeHostApi, prefs: android.content.SharedPreferences, requestId: String, optionId: String, label: String, onUpdate: (NativeHostApi.Job) -> Unit = {}) {
     api.createDownload(requestId, optionId) { result ->
         result.onFailure { error -> rssOnMain { Toast.makeText(context, error.message ?: "Download failed", Toast.LENGTH_LONG).show() } }
         result.onSuccess { job ->
-            rssOnMain { Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show() }
+            rssOnMain {
+                onUpdate(job)
+                Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+            }
             fun poll(attempt: Int) {
                 if (attempt > 150) {
                     rssOnMain { Toast.makeText(context, "Download is still processing. Check Download history.", Toast.LENGTH_LONG).show() }
@@ -89,6 +92,7 @@ private fun queueAndDeliver(context: Context, api: NativeHostApi, prefs: android
                 api.getDownload(job.jobId) { statusResult ->
                     statusResult.onFailure { error -> rssOnMain { Toast.makeText(context, error.message ?: "Download status unavailable", Toast.LENGTH_LONG).show() } }
                     statusResult.onSuccess { status ->
+                        rssOnMain { onUpdate(status) }
                         val state = status.status.lowercase()
                         if (state in listOf("completed", "complete", "ready", "success")) {
                             val filename = status.filename?.takeIf { it.isNotBlank() } ?: label.replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -193,6 +197,7 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var historyJobs by remember { mutableStateOf<List<NativeHostApi.Job>?>(null) }
     var premiumText by remember { mutableStateOf<String?>(null) }
     var analyzing by remember { mutableStateOf(false) }
+    var activeDownload by remember { mutableStateOf<NativeHostApi.Job?>(null) }
     val downloadLocationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching {
@@ -409,6 +414,43 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            activeDownload?.let { job ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(job.title ?: job.filename ?: "Download", fontWeight = FontWeight.Bold)
+                            val progress = job.progress?.coerceIn(0, 100) ?: 0
+                            Text("${job.status} • $progress%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            LinearProgressIndicator(
+                                progress = progress / 100f,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            val transferred = job.downloadedBytes ?: 0L
+                            val total = job.totalBytes ?: 0L
+                            if (total > 0L) Text("${formatBytes(transferred)} / ${formatBytes(total)}")
+                            job.speed?.takeIf { it > 0L }?.let { Text("${formatBytes(it)}/s") }
+                            if (job.status.equals("QUEUED", true) || job.status.equals("DOWNLOADING", true) || job.status.equals("PROCESSING", true)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        api.cancel(job.jobId) { result ->
+                                            rssOnMain { result.onSuccess { activeDownload = it }.onFailure { Toast.makeText(context, it.message ?: "Unable to cancel download", Toast.LENGTH_LONG).show() } }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Cancel, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Cancel")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             when (tab) {
                     0 -> {
                         item {
@@ -482,7 +524,7 @@ if (result.mediaOptions.isEmpty()) {
                                                 }
                                             }
                                             Button(
-                                                onClick = { queueAndDeliver(context, api, prefs, result.requestId, selected.id, result.title) },
+                                                onClick = { queueAndDeliver(context, api, prefs, result.requestId, selected.id, result.title) { activeDownload = it } },
                                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                                             ) {
                                                 Icon(Icons.Default.Download, null)
@@ -496,7 +538,7 @@ if (result.mediaOptions.isEmpty()) {
                     }
                     1 -> {
                         item { Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Audio Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); OutlinedTextField(value = url, onValueChange = { url = it.trim(); lastAnalyzed = ""; analysis = null; analysisError = null }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Link, null) }, label = { Text("Paste audio URL") });
-Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled = !analyzing) { Icon(Icons.Default.Search, null); Spacer(Modifier.width(8.dp)); Text(if (analyzing) "Analyzing…" else "Analyze") }; if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { queueAndDeliver(context, api, prefs, analysis!!.requestId, option.id, analysis!!.title) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
+Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled = !analyzing) { Icon(Icons.Default.Search, null); Spacer(Modifier.width(8.dp)); Text(if (analyzing) "Analyzing…" else "Analyze") }; if (analysis != null) { val audio = analysis!!.mediaOptions.filter { it.kind.equals("audio", true) || it.kind.equals("music", true) }; if (audio.isNotEmpty()) audio.forEach { option -> Button(onClick = { queueAndDeliver(context, api, prefs, analysis!!.requestId, option.id, analysis!!.title) { activeDownload = it } }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text("${option.format.uppercase()} • ${option.quality ?: "Original"}") } } else Text("No authorized audio download option found.", color = MaterialTheme.colorScheme.onSurfaceVariant) } else if (url.isNotBlank()) Text(analysisError ?: "Analyzing…", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
                     }
                     2 -> {
                         item {
@@ -559,7 +601,7 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                                     if (meta.isNotBlank()) Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     movie.mediaOptions.forEach { option ->
                                         Button(
-                                            onClick = { queueAndDeliver(context, api, prefs, movie.requestId ?: movie.id, option.id, movie.title) },
+                                            onClick = { queueAndDeliver(context, api, prefs, movie.requestId ?: movie.id, option.id, movie.title) { activeDownload = it } },
                                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                                         ) {
                                             Icon(Icons.Default.Download, null)
@@ -648,6 +690,18 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
             confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text("Close") } }
         )
     }
+}
+
+private fun formatBytes(value: Long): String {
+    if (value < 1024L) return "$value B"
+    val units = arrayOf("KB", "MB", "GB", "TB")
+    var size = value.toDouble()
+    var index = -1
+    while (size >= 1024.0 && index < units.lastIndex) {
+        size /= 1024.0
+        index++
+    }
+    return String.format(java.util.Locale.US, "%.1f %s", size, units[index])
 }
 
 private fun openWebPage(context: Context, url: String) {
