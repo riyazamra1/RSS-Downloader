@@ -7,6 +7,8 @@ import java.io.OutputStream
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.Executors
+import android.os.Handler
+import android.os.Looper
 
 /** Native Android implementation of the RSS Downloader host contract. */
 class NativeHostApi(private val baseUrl: String, private val accessToken: String? = null, private val appKey: String? = null) {
@@ -17,18 +19,23 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     data class Analysis(val requestId: String, val title: String, val normalizedUrl: String, val thumbnailUrl: String?, val mediaOptions: List<MediaOption>)
 
     private val executor = Executors.newCachedThreadPool()
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun <T> deliver(callback: (Result<T>) -> Unit, result: Result<T>) {
+        mainHandler.post { callback(result) }
+    }
 
     fun configured(): Boolean = baseUrl.startsWith("https://")
 
     fun analyze(url: String, callback: (Result<Analysis>) -> Unit) = executor.execute {
-        callback(runCatching {
+        deliver(callback, runCatching {
             val json = requestObject("/api/downloader/analyze", "POST", JSONObject().put("url", url))
             Analysis(json.optString("requestId").ifBlank { json.optString("id") }, json.optString("title", "RSS Download"), json.optString("normalizedUrl", url), json.optString("thumbnailUrl", "").ifBlank { null }, mediaOptions(json.optJSONArray("mediaOptions") ?: json.optJSONArray("downloadOptions") ?: json.optJSONArray("formats") ?: json.optJSONArray("options")))
         })
     }
 
     fun search(tab: String, query: String, callback: (Result<List<SearchResult>>) -> Unit) = executor.execute {
-        callback(runCatching {
+        deliver(callback, runCatching {
             val effectiveQuery = if (query.isBlank()) when (tab) {
                 TabOrder.TAMIL -> "2026 Tamil films"
                 TabOrder.DUBBED -> "2026 Tamil dubbed films"
@@ -41,19 +48,19 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         })
     }
 
-    fun listMediaOptions(requestId: String, callback: (Result<List<MediaOption>>) -> Unit) = executor.execute { callback(runCatching { mediaOptions(JSONArray(requestText("/api/downloader/media-options/${enc(requestId)}", "GET", null))) }) }
-    fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute { callback(runCatching { parseJob(requestObject("/api/downloader/download", "POST", JSONObject().put("requestId", requestId).put("mediaOptionId", optionId).put("authorizationApproved", true))) }) }
-    fun getDownload(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { callback(runCatching { val json = requestObject("/api/downloader/downloads/${enc(jobId)}", "GET", null); val jobs = json.optJSONArray("jobs"); if (jobs != null) { (0 until jobs.length()).asSequence().map { jobs.getJSONObject(it) }.firstOrNull { it.optString("jobId") == jobId }?.let(::parseJob) ?: throw IllegalStateException("Download job not found.") } else parseJob(json) }) }
+    fun listMediaOptions(requestId: String, callback: (Result<List<MediaOption>>) -> Unit) = executor.execute { deliver(callback, runCatching { mediaOptions(JSONArray(requestText("/api/downloader/media-options/${enc(requestId)}", "GET", null))) }) }
+    fun createDownload(requestId: String, optionId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { parseJob(requestObject("/api/downloader/download", "POST", JSONObject().put("requestId", requestId).put("mediaOptionId", optionId).put("authorizationApproved", true))) }) }
+    fun getDownload(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { val json = requestObject("/api/downloader/downloads/${enc(jobId)}", "GET", null); val jobs = json.optJSONArray("jobs"); if (jobs != null) { (0 until jobs.length()).asSequence().map { jobs.getJSONObject(it) }.firstOrNull { it.optString("jobId") == jobId }?.let(::parseJob) ?: throw IllegalStateException("Download job not found.") } else parseJob(json) }) }
 
-    fun listDownloads(callback: (Result<List<Job>>) -> Unit) = executor.execute { callback(runCatching { val a = requestObject("/api/downloader/downloads", "GET", null).optJSONArray("jobs") ?: JSONArray(); buildList { for (i in 0 until a.length()) add(parseJob(a.getJSONObject(i))) } }) }
-    fun cancel(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { callback(runCatching { parseJob(requestObject("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) }) }
+    fun listDownloads(callback: (Result<List<Job>>) -> Unit) = executor.execute { deliver(callback, runCatching { val a = requestObject("/api/downloader/downloads", "GET", null).optJSONArray("jobs") ?: JSONArray(); buildList { for (i in 0 until a.length()) add(parseJob(a.getJSONObject(i))) } }) }
+    fun cancel(jobId: String, callback: (Result<Job>) -> Unit) = executor.execute { deliver(callback, runCatching { parseJob(requestObject("/api/downloader/cancel/${enc(jobId)}", "POST", JSONObject())) }) }
 
     /**
      * Streams a completed RAY file through RSS Core directly into the caller-provided
      * SAF output stream. The RSS Core/RAY credentials remain inside request headers.
      */
     fun downloadFile(jobId: String, output: OutputStream, callback: (Result<Long>) -> Unit) = executor.execute {
-        callback(runCatching {
+        deliver(callback, runCatching {
             var copied = 0L
             val connection = URL(baseUrl.trimEnd('/') + "/api/downloader/jobs/${enc(jobId)}/file").openConnection() as HttpURLConnection
             try {
@@ -90,7 +97,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         })
     }
 
-    fun checkPremium(email: String, callback: (Result<Boolean>) -> Unit) = executor.execute { callback(runCatching {
+    fun checkPremium(email: String, callback: (Result<Boolean>) -> Unit) = executor.execute { deliver(callback, runCatching {
         if (email.isBlank() || appKey.isNullOrBlank()) return@runCatching false
         val url = baseUrl.trimEnd('/') + "/api/v1/entitlements/check?app_key=" + enc(appKey!!) + "&email=" + enc(email.trim())
         val result = execute(url, "GET", null)
@@ -99,10 +106,10 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     }) }
 
     fun premiumPlan(callback: (Result<JSONObject>) -> Unit) = executor.execute {
-        callback(runCatching { requestObject("/api/v1/payments/plans", "GET", null) })
+        deliver(callback, runCatching { requestObject("/api/v1/payments/plans", "GET", null) })
     }
 
-    fun createPremiumCheckout(email: String, successUrl: String, cancelUrl: String, callback: (Result<PaymentCheckout>) -> Unit) = executor.execute { callback(runCatching {
+    fun createPremiumCheckout(email: String, successUrl: String, cancelUrl: String, callback: (Result<PaymentCheckout>) -> Unit) = executor.execute { deliver(callback, runCatching {
         val key = appKey ?: throw IllegalStateException("RSS Downloader account is not registered.")
         if (email.isBlank()) throw IllegalStateException("RSS Downloader account email is missing.")
         val body = JSONObject()
@@ -131,7 +138,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     )
 
     fun paymentOrder(orderId: String, callback: (Result<JSONObject>) -> Unit) = executor.execute {
-        callback(runCatching { requestObject("/api/v1/payments/orders/" + enc(orderId), "GET", null) })
+        deliver(callback, runCatching { requestObject("/api/v1/payments/orders/" + enc(orderId), "GET", null) })
     }
 
     private fun mediaOptions(array: JSONArray?): List<MediaOption> { if (array == null) return emptyList(); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; val id = o.optString("id").ifBlank { o.optString("mediaOptionId") }; if (id.isBlank()) continue; add(MediaOption(id, o.optString("kind", "media"), o.optString("format", ""), o.optString("quality", "").ifBlank { null }, if (o.has("sizeBytes") && !o.isNull("sizeBytes")) o.optLong("sizeBytes") else null, if (o.has("width") && !o.isNull("width")) o.optInt("width") else null, if (o.has("height") && !o.isNull("height")) o.optInt("height") else null)) } } }
