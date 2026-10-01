@@ -90,7 +90,16 @@ private fun queueAndDeliver(context: Context, api: NativeHostApi, prefs: android
                     return
                 }
                 api.getDownload(job.jobId) { statusResult ->
-                    statusResult.onFailure { error -> rssOnMain { Toast.makeText(context, error.message ?: "Download status unavailable", Toast.LENGTH_LONG).show() } }
+                    statusResult.onFailure { error ->
+                        // Status can briefly fail while RSS Core/RAY is moving a job
+                        // between queued/running workers. Do not turn a transient
+                        // status failure into a false download failure.
+                        if (attempt < 150) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ poll(attempt + 1) }, 2000)
+                        } else {
+                            rssOnMain { Toast.makeText(context, error.message ?: "Download status unavailable", Toast.LENGTH_LONG).show() }
+                        }
+                    }
                     statusResult.onSuccess { status ->
                         rssOnMain { onUpdate(status) }
                         val state = status.status.lowercase()
