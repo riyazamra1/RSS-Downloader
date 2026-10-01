@@ -213,6 +213,50 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         }
     }
 
+    fun analyzeNow(inputUrl: String = url) {
+        val target = inputUrl.trim()
+        if (!target.startsWith("http://") && !target.startsWith("https://")) {
+            analysisError = "Enter or paste a valid URL first."
+            return
+        }
+        lastAnalyzed = target
+        analysis = null
+        preview = false
+        analysisError = null
+        analyzing = true
+        api.analyze(target) { result ->
+            rssOnMain {
+                result.onSuccess { value ->
+                    fun finish(options: List<NativeHostApi.MediaOption>) {
+                        analysis = value.copy(mediaOptions = options)
+                        preview = true
+                        analyzing = false
+                        options.firstOrNull { it.kind.equals("image", true) }?.format
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { selectedImageFormat = it.uppercase() }
+                        options.firstOrNull()?.let {
+                            selectedSocialFormat = it.format.ifBlank { "Original" }.uppercase()
+                            selectedSocialQuality = it.quality.orEmpty()
+                        }
+                    }
+                    if (value.mediaOptions.isNotEmpty() || value.requestId.isBlank()) {
+                        finish(value.mediaOptions)
+                    } else {
+                        api.listMediaOptions(value.requestId) { optionsResult ->
+                            rssOnMain {
+                                optionsResult.onSuccess { finish(it) }
+                                    .onFailure { finish(value.mediaOptions) }
+                            }
+                        }
+                    }
+                }.onFailure {
+                    analysisError = it.message ?: "Analysis failed"
+                    analyzing = false
+                }
+            }
+        }
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -276,49 +320,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         }
     }
 
-    fun analyzeNow(inputUrl: String = url) {
-        val target = inputUrl.trim()
-        if (!target.startsWith("http://") && !target.startsWith("https://")) {
-            analysisError = "Enter or paste a valid URL first."
-            return
-        }
-        lastAnalyzed = target
-        analysis = null
-        preview = false
-        analysisError = null
-        analyzing = true
-        api.analyze(target) { result ->
-            rssOnMain {
-                result.onSuccess { value ->
-                    fun finish(options: List<NativeHostApi.MediaOption>) {
-                        analysis = value.copy(mediaOptions = options)
-                        preview = true
-                        analyzing = false
-                        options.firstOrNull { it.kind.equals("image", true) }?.format
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { selectedImageFormat = it.uppercase() }
-                        options.firstOrNull()?.let {
-                            selectedSocialFormat = it.format.ifBlank { "Original" }.uppercase()
-                            selectedSocialQuality = it.quality.orEmpty()
-                        }
-                    }
-                    if (value.mediaOptions.isNotEmpty() || value.requestId.isBlank()) {
-                        finish(value.mediaOptions)
-                    } else {
-                        api.listMediaOptions(value.requestId) { optionsResult ->
-                            rssOnMain {
-                                optionsResult.onSuccess { finish(it) }
-                                    .onFailure { finish(value.mediaOptions) }
-                            }
-                        }
-                    }
-                }.onFailure {
-                    analysisError = it.message ?: "Analysis failed"
-                    analyzing = false
-                }
-            }
-        }
-    }
 
     LaunchedEffect(tab) {
         if (tab != 0) {
