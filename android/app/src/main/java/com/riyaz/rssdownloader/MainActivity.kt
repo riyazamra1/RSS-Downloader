@@ -252,6 +252,22 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
         }
     }
 
+    fun pasteClipboard() {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val value = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim().orEmpty()
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            url = value
+            analysis = null
+            analysisError = null
+            preview = false
+            lastAnalyzed = ""
+            analyzing = false
+            Toast.makeText(context, "URL pasted from clipboard", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "No HTTP/HTTPS URL found in clipboard", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun analyzeNow() {
         val target = url.trim()
         if (!target.startsWith("http://") && !target.startsWith("https://")) {
@@ -404,6 +420,11 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true,
                                         leadingIcon = { Icon(Icons.Default.Link, null) },
+                                        trailingIcon = {
+                                            IconButton(onClick = { pasteClipboard() }) {
+                                                Icon(Icons.Default.ContentPaste, contentDescription = "Paste from clipboard")
+                                            }
+                                        },
                                         label = { Text("Paste URL") }
                                     )
                                     Spacer(Modifier.height(10.dp))
