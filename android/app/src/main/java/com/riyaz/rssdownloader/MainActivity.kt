@@ -199,6 +199,9 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                     analysis = value
                     preview = true
                     analyzing = false
+                    value.mediaOptions.firstOrNull { it.kind.equals("image", true) }?.format
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { selectedImageFormat = it.uppercase() }
                 }.onFailure {
                     analysisError = it.message ?: "Analysis failed"
                     analyzing = false
@@ -504,6 +507,16 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                             settings.displayZoomControls = false
                             setBackgroundColor(android.graphics.Color.WHITE)
                             webViewClient = WebViewClient()
+                            setOnTouchListener { view, event ->
+                                if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN ||
+                                    event.actionMasked == android.view.MotionEvent.ACTION_MOVE) {
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                } else if (event.actionMasked == android.view.MotionEvent.ACTION_UP ||
+                                    event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
+                                    view.parent?.requestDisallowInterceptTouchEvent(false)
+                                }
+                                false
+                            }
                             loadUrl(pageUrl)
                         }
                     },
@@ -550,6 +563,16 @@ private fun MovieLivePage(url: String) {
                 isHorizontalScrollBarEnabled = false
                 setBackgroundColor(android.graphics.Color.WHITE)
                 webViewClient = WebViewClient()
+                setOnTouchListener { view, event ->
+                    if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN ||
+                        event.actionMasked == android.view.MotionEvent.ACTION_MOVE) {
+                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                    } else if (event.actionMasked == android.view.MotionEvent.ACTION_UP ||
+                        event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
+                        view.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    false
+                }
             }
         },
         update = { webView ->
