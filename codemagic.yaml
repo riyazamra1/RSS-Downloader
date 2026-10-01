@@ -21,6 +21,12 @@ workflows:
           test -f android/build.gradle.kts
           test -f android/app/build.gradle.kts
 
+      - name: Prepare Android SDK location
+        script: |
+          set -e
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+          test -s "$CM_BUILD_DIR/android/local.properties"
+
       - name: Build debug APK
         script: |
           set -e
