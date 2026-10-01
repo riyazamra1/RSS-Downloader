@@ -44,9 +44,6 @@ import com.riyaz.rss.common.theme.RssTheme
 import com.riyaz.rss.common.navigation.RssMenuItem
 import com.riyaz.rss.common.navigation.RssSlideMenu
 import coil.compose.AsyncImage
-import androidx.compose.ui.viewinterop.AndroidView
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -195,7 +192,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
     var historyJobs by remember { mutableStateOf<List<NativeHostApi.Job>?>(null) }
     var premiumText by remember { mutableStateOf<String?>(null) }
     var analyzing by remember { mutableStateOf(false) }
-    var sourceWebView by remember { mutableStateOf<String?>(null) }
     val downloadLocationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching {
@@ -408,9 +404,6 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
                                         result.thumbnailUrl?.let { thumb -> AsyncImage(model = thumb, contentDescription = result.title, modifier = Modifier.fillMaxWidth().height(210.dp), contentScale = ContentScale.Crop) }
                                         Text(result.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                         Text(result.normalizedUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
-OutlinedButton(onClick = { sourceWebView = result.normalizedUrl }, modifier = Modifier.fillMaxWidth()) {
-    Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(8.dp)); Text("Source")
-}
 if (result.mediaOptions.isEmpty()) {
                                             Text("No download options returned by RSS Core.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         } else {
@@ -656,77 +649,6 @@ private fun openWebPage(context: Context, url: String) {
         else Toast.makeText(context, "No browser is available.", Toast.LENGTH_LONG).show()
     }.onFailure {
         Toast.makeText(context, "Unable to open page.", Toast.LENGTH_LONG).show()
-    }
-}
-
-@Composable
-private fun MovieLivePage(url: String) {
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.loadsImagesAutomatically = true
-                settings.allowFileAccess = false
-                settings.allowContentAccess = true
-                settings.setSupportZoom(true)
-                settings.builtInZoomControls = true
-                settings.displayZoomControls = false
-                isVerticalScrollBarEnabled = true
-                isHorizontalScrollBarEnabled = false
-                setBackgroundColor(android.graphics.Color.WHITE)
-                webViewClient = WebViewClient()
-                setOnTouchListener { view, event ->
-                    if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN ||
-                        event.actionMasked == android.view.MotionEvent.ACTION_MOVE) {
-                        view.parent?.requestDisallowInterceptTouchEvent(true)
-                    } else if (event.actionMasked == android.view.MotionEvent.ACTION_UP ||
-                        event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
-                        view.parent?.requestDisallowInterceptTouchEvent(false)
-                    }
-                    false
-                }
-            }
-        },
-        update = { webView ->
-            if (webView.url != url) webView.loadUrl(url)
-        },
-        modifier = Modifier.fillMaxWidth().height(620.dp)
-    )
-}
-
-@Composable
-private fun MovieDetails(movie: NativeHostApi.SearchResult, api: NativeHostApi, prefs: android.content.SharedPreferences, onBack: () -> Unit) {
-    val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = onBack) { Text("‹ Movies") }
-        Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-            Column(Modifier.padding(16.dp)) {
-                Text(movie.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                val meta = listOfNotNull(movie.year?.toString(), movie.language, movie.releaseDate, movie.runtime, movie.director).joinToString(" • ")
-                if (meta.isNotBlank()) Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                movie.synopsis?.takeIf { it.isNotBlank() }?.let { Text(it, Modifier.padding(top = 12.dp)) }
-            }
-        }
-        Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Quality", fontWeight = FontWeight.Bold)
-                if (movie.mediaOptions.isEmpty()) {
-                    Text("No authorized download options available.")
-                } else movie.mediaOptions.forEach { option ->
-                    Button(
-                        onClick = {
-                            queueAndDeliver(context, api, prefs, movie.requestId ?: movie.id, option.id, movie.title)
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Download, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (option.kind.equals("image", ignoreCase = true)) "Download Original Image • ${option.format.uppercase()}" else "${option.format.uppercase()} • ${option.quality ?: "Available"}")
-                    }
-                }
-            }
-        }
     }
 }
 
