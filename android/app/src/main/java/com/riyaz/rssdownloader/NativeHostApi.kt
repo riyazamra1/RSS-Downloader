@@ -84,23 +84,40 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     fun downloadFile(jobId: String, output: OutputStream, callback: (Result<Long>) -> Unit) = executor.execute {
         deliver(callback, runCatching {
             var copied = 0L
-            val connection = URL(baseUrl.trimEnd('/') + "/api/downloader/jobs/${enc(jobId)}/file").openConnection() as HttpURLConnection
-            try {
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 15000
-                connection.readTimeout = 120000
-                connection.instanceFollowRedirects = true
-                connection.useCaches = false
-                connection.setRequestProperty("Accept", "*/*")
-                connection.setRequestProperty("X-RSS-App-Id", "rss-downloader")
-                if (!accessToken.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $accessToken")
-                if (!appKey.isNullOrBlank()) connection.setRequestProperty("X-RSS-App-Key", appKey)
-                val code = connection.responseCode
-                if (code !in 200..299) {
-                    val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                    throw IllegalStateException("RSS Core file download failed ($code). ${error.take(240)}")
+            var connection: HttpURLConnection? = null
+            var lastCode = 0
+            var lastError = ""
+            val filePaths = listOf(
+                "/api/downloader/jobs/${enc(jobId)}/file",
+                "/api/v1/downloader/jobs/${enc(jobId)}/file",
+                "/v1/downloader/jobs/${enc(jobId)}/file",
+                "/api/downloader/downloads/${enc(jobId)}/file",
+                "/api/v1/downloader/downloads/${enc(jobId)}/file",
+                "/v1/downloader/downloads/${enc(jobId)}/file"
+            ).distinct()
+            for (path in filePaths) {
+                val candidate = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
+                candidate.requestMethod = "GET"
+                candidate.connectTimeout = 15000
+                candidate.readTimeout = 120000
+                candidate.instanceFollowRedirects = true
+                candidate.useCaches = false
+                candidate.setRequestProperty("Accept", "*/*")
+                candidate.setRequestProperty("X-RSS-App-Id", "rss-downloader")
+                if (!accessToken.isNullOrBlank()) candidate.setRequestProperty("Authorization", "Bearer $accessToken")
+                if (!appKey.isNullOrBlank()) candidate.setRequestProperty("X-RSS-App-Key", appKey)
+                val candidateCode = candidate.responseCode
+                if (candidateCode in 200..299) {
+                    connection = candidate
+                    break
                 }
-                connection.inputStream.use { input ->
+                lastCode = candidateCode
+                lastError = candidate.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty().take(240)
+                candidate.disconnect()
+            }
+            val activeConnection = connection ?: throw IllegalStateException("RSS Core file download failed ($lastCode). ${lastError.ifBlank { "File endpoint unavailable." }}")
+            try {
+                activeConnection.inputStream.use { input ->
                     val buffer = ByteArray(256 * 1024)
                     while (true) {
                         val read = input.read(buffer)
@@ -114,7 +131,7 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
                 copied
             } finally {
                 runCatching { output.close() }
-                connection.disconnect()
+                activeConnection.disconnect()
             }
         })
     }
