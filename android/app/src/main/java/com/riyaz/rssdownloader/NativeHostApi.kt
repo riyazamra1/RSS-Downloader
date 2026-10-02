@@ -234,11 +234,11 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
                 last = fallback
             }
             throw IllegalStateException(
-                "RSS host API request failed (\${primary.first}; fallback \${last.first}). " +
+                "RSS host API request failed (${primary.first}; fallback ${last.first}). " +
                     last.second.take(240).ifBlank { primary.second.take(240).ifBlank { "Endpoint unavailable." } }
             )
         }
-        throw IllegalStateException("RSS host API request failed (\${primary.first}). \${primary.second.take(240).ifBlank { "Endpoint unavailable." }}")
+        throw IllegalStateException("RSS host API request failed (${primary.first}). ${primary.second.take(240).ifBlank { "Endpoint unavailable." }}")
     }
 
     private fun execute(url: String, method: String, body: JSONObject?): Pair<Int, String> {
