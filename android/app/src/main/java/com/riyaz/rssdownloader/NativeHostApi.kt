@@ -198,22 +198,30 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
         if (!configured()) throw IllegalStateException("RSS host API is not configured.")
         val primary = execute(baseUrl.trimEnd('/') + path, method, body)
         if (primary.first in 200..299) return primary.second
-        // RSS Core has both the current and legacy downloader gateway paths.
-        // Some deployments can temporarily return a 5xx while the legacy route
-        // remains healthy, so retry the compatible gateway instead of failing
-        // the user immediately after the job has already been accepted.
+        // RSS Core deployments may expose the dedicated downloader gateway at
+        // /api/downloader, /api/v1/downloader, or /v1/downloader.
+        // Try compatible gateways on route/transient-server errors.
         if (primary.first == 404 || primary.first in 500..504) {
-            if (path.startsWith("/api/") && !path.startsWith("/api/v1/")) {
-                val fallbackPath = path.replaceFirst("/api/", "/api/v1/")
+            val fallbackPaths = buildList {
+                if (path.startsWith("/api/") && !path.startsWith("/api/v1/")) {
+                    add(path.replaceFirst("/api/", "/api/v1/"))
+                    add(path.replaceFirst("/api/", "/v1/"))
+                } else if (path.startsWith("/api/v1/")) {
+                    add(path.replaceFirst("/api/v1/", "/v1/"))
+                }
+            }.distinct()
+            var last = primary
+            for (fallbackPath in fallbackPaths) {
                 val fallback = execute(baseUrl.trimEnd('/') + fallbackPath, method, body)
                 if (fallback.first in 200..299) return fallback.second
-                throw IllegalStateException(
-                    "RSS host API request failed (${primary.first}; legacy ${fallback.first}). " +
-                        fallback.second.take(240).ifBlank { primary.second.take(240).ifBlank { "Endpoint unavailable." } }
-                )
+                last = fallback
             }
+            throw IllegalStateException(
+                "RSS host API request failed (\${primary.first}; fallback \${last.first}). " +
+                    last.second.take(240).ifBlank { primary.second.take(240).ifBlank { "Endpoint unavailable." } }
+            )
         }
-        throw IllegalStateException("RSS host API request failed (${primary.first}). ${primary.second.take(240).ifBlank { "Endpoint unavailable." }}")
+        throw IllegalStateException("RSS host API request failed (\${primary.first}). \${primary.second.take(240).ifBlank { "Endpoint unavailable." }}")
     }
 
     private fun execute(url: String, method: String, body: JSONObject?): Pair<Int, String> {
