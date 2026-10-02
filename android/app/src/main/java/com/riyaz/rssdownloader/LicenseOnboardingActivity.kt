@@ -71,8 +71,15 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                     showOnboarding()
                 }
             } else {
-                showVerification()
-                checkVerification()
+                // Registration is complete even when email verification is still pending.
+                // Let the user enter the app immediately; the app will show a persistent
+                // verification-pending notice and the user can verify later.
+                if (prefs.getBoolean("onboarding_complete", false)) {
+                    openApp()
+                } else {
+                    showVerification()
+                    checkVerification()
+                }
             }
             return
         }
@@ -242,14 +249,16 @@ class LicenseOnboardingActivity : AppCompatActivity() {
                         .putString("display_name",n).putString("email",e)
                         .putString("plan",r.optJSONObject("license")?.optString("plan").orEmpty())
                         .putString("license_status",r.optJSONObject("license")?.optString("status").orEmpty()).apply()
+                    // Account creation is successful even when email verification is
+                    // pending. Do not block the user behind the verification screen.
+                    prefs.edit().putBoolean("onboarding_complete", true).apply()
                     if (verified) {
                         // An already-verified account returned through registration must use
                         // the normal returning-session path so RSS Core can issue Welcome Back
                         // exactly once for a new device/session.
                         sendReturningSession()
                     } else {
-                        showVerification()
-                        updateVerificationCountdown()
+                        openApp()
                     }
                 }
                     .onFailure {
