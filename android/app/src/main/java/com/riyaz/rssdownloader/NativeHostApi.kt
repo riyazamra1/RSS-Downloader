@@ -145,7 +145,10 @@ class NativeHostApi(private val baseUrl: String, private val accessToken: String
     }) }
 
     fun premiumPlan(callback: (Result<JSONObject>) -> Unit) = executor.execute {
-        deliver(callback, runCatching { requestObject("/api/v1/payments/plans", "GET", null) })
+        deliver(callback, runCatching {
+            // RSS Core's live pricing catalog is the canonical source for app plans.
+            requestObject("/api/v1/pricing?project_key=rss-downloader", "GET", null)
+        })
     }
 
     fun createPremiumCheckout(email: String, planKey: String, successUrl: String, cancelUrl: String, callback: (Result<PaymentCheckout>) -> Unit) = executor.execute { deliver(callback, runCatching {
