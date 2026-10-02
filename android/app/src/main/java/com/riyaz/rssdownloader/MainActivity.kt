@@ -661,7 +661,7 @@ Button(onClick = { analyzeNow() }, modifier = Modifier.fillMaxWidth(), enabled =
                                 "RSS Core account" -> settingsDialog = "Account: " + prefs.getString("email", "Not signed in")
                                 "Download location" -> downloadLocationLauncher.launch(prefs.getString("download_tree_uri", null)?.let { Uri.parse(it) })
                                 "Download history" -> api.listDownloads { r -> rssOnMain { r.onSuccess { historyJobs = it }.onFailure { premiumText = it.message ?: "Download history unavailable" } } }
-                                "Premium" -> api.checkPremium(prefs.getString("email", "").orEmpty()) { r -> rssOnMain { r.onSuccess { premiumText = if (it) "Premium is active." else "Premium is not active." } .onFailure { premiumText = it.message ?: "Premium status unavailable" } } }
+                                "Premium" -> context.startActivity(Intent(context, RssMonetizationActivity::class.java))
                                 "Connection" -> premiumText = if (api.configured()) "RSS Core is configured at ${BuildConfig.RSS_HOST_BASE_URL}" else "RSS Core is not configured."
                                 "Privacy Policy" -> openWebPage(context, "https://rsscore.cv/privacy")
                                 "Terms & Conditions" -> openWebPage(context, "https://rsscore.cv/terms")
