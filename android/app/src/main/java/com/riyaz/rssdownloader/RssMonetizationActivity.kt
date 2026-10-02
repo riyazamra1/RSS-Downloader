@@ -20,7 +20,16 @@ class RssMonetizationActivity : Activity() {
     private lateinit var plansContainer: LinearLayout
     private lateinit var loading: ProgressBar
 
-    data class Plan(val key: String, val title: String, val description: String, val amount: Int, val currency: String, val oneTime: Boolean)
+    data class Plan(
+        val key: String,
+        val title: String,
+        val description: String,
+        val amount: Int,
+        val listAmount: Int,
+        val currency: String,
+        val oneTime: Boolean,
+        val billingPeriod: String
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,34 +101,73 @@ class RssMonetizationActivity : Activity() {
             val key = p.optString("plan_key").ifBlank { p.optString("key").ifBlank { p.optString("id") } }
             if (key.isBlank()) continue
             val rawTitle = p.optString("name").ifBlank { p.optString("title") }
-            val duration = p.optString("duration").ifBlank { p.optString("billing_period").ifBlank { p.optString("billingPeriod") } }
+            val billing = p.optString("billing_period").ifBlank {
+                p.optString("billingPeriod").ifBlank { p.optString("type") }
+            }.trim().lowercase()
+            val durationDays = when {
+                p.has("duration_days") && !p.isNull("duration_days") -> p.optInt("duration_days")
+                p.has("durationDays") && !p.isNull("durationDays") -> p.optInt("durationDays")
+                else -> 0
+            }
             val oneTime = p.optBoolean("one_time", false) || p.optBoolean("oneTime", false) ||
-                duration.equals("one_time", true) || duration.equals("lifetime", true) ||
+                billing == "one_time" || billing == "lifetime" ||
                 key.contains("LIFETIME", true) || key.contains("ONE_TIME", true)
+            val yearly = billing == "yearly" || billing == "annual" ||
+                durationDays in 330..400 || key.contains("1_YEAR", true) || key.contains("YEARLY", true) ||
+                rawTitle.contains("year", true)
             val title = when {
                 oneTime -> "One-Time"
-                duration.contains("year", true) || key.contains("1_YEAR", true) || key.contains("YEARLY", true) -> "Year"
-                rawTitle.isNotBlank() -> rawTitle
-                else -> key.replace("_", " ")
+                yearly -> "Year"
+                else -> rawTitle.ifBlank { key.replace("_", " ") }
             }
-            val amount = when {
+            val listAmount = when {
+                p.has("list_price_lkr") -> p.optInt("list_price_lkr")
                 p.has("amount_lkr") -> p.optInt("amount_lkr")
                 p.has("price_lkr") -> p.optInt("price_lkr")
+                p.has("listPriceLkr") -> p.optInt("listPriceLkr")
                 p.has("amount") -> p.optInt("amount")
                 p.has("price") -> p.optInt("price")
                 else -> 0
             }
-            result.add(Plan(key, title, p.optString("description"), amount, p.optString("currency").ifBlank { "LKR" }, oneTime))
+            val amount = when {
+                p.has("final_price_lkr") -> p.optInt("final_price_lkr")
+                p.has("finalPriceLkr") -> p.optInt("finalPriceLkr")
+                else -> listAmount
+            }
+            result.add(
+                Plan(
+                    key = key,
+                    title = title,
+                    description = p.optString("description"),
+                    amount = amount,
+                    listAmount = listAmount,
+                    currency = p.optString("currency").ifBlank { "LKR" },
+                    oneTime = oneTime,
+                    billingPeriod = billing
+                )
+            )
         }
-        return result.filter { it.title.equals("Year", true) || it.title.equals("One-Time", true) || it.oneTime }.distinctBy { it.key }
+        return result
+            .filter { it.title.equals("Year", true) || it.title.equals("One-Time", true) }
+            .distinctBy { it.key }
     }
 
     private fun addPlanCard(plan: Plan) {
         val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 20, 24, 20); setBackgroundResource(android.R.drawable.dialog_holo_light_frame) }
         card.addView(TextView(this).apply { text = plan.title; textSize = 20f; typeface = Typeface.DEFAULT_BOLD })
-        card.addView(TextView(this).apply { text = if (plan.amount > 0) "@@{plan.currency} @@{plan.amount}" else "Price shown by RSS Core"; textSize = 19f; setPadding(0, 6, 0, 4) })
+        card.addView(TextView(this).apply {
+            text = if (plan.amount > 0) {
+                val current = "${plan.currency} ${plan.amount}"
+                if (plan.listAmount > plan.amount) "$current  •  Was ${plan.currency} ${plan.listAmount}" else current
+            } else "Price shown by RSS Core"
+            textSize = 19f
+            setPadding(0, 6, 0, 4)
+        })
         if (plan.description.isNotBlank()) card.addView(TextView(this).apply { text = plan.description; textSize = 14f; setPadding(0, 0, 0, 8) })
-        card.addView(Button(this).apply { text = "Continue with @@{plan.title}"; setOnClickListener { startPremiumCheckout(plan) } })
+        card.addView(Button(this).apply {
+            text = "Continue with ${plan.title}"
+            setOnClickListener { startPremiumCheckout(plan) }
+        })
         plansContainer.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
     }
 
