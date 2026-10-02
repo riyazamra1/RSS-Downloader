@@ -427,6 +427,34 @@ private fun DownloaderApp(api: NativeHostApi, prefs: android.content.SharedPrefe
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (prefs.getBoolean("registered", false) && !prefs.getBoolean("email_verified", false)) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Email verification pending", fontWeight = FontWeight.Bold)
+                                Text(
+                                    "You can use RSS Downloader now. Verify your email later to secure your account.",
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            TextButton(onClick = {
+                                context.startActivity(Intent(context, LicenseOnboardingActivity::class.java))
+                            }) {
+                                Text("Verify")
+                            }
+                        }
+                    }
+                }
+            }
             activeDownload?.let { job ->
                 item {
                     Card(
